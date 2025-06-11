@@ -94,7 +94,7 @@ if MODE == "ממשק טפסים":
                     if subs is None:
                         st.info("אין צורך בחלופה")
                     elif subs:
-                        line = " / ".join(f\"{t} ({s})\" for _, t, s in subs)
+                        line = " / ".join(f"{t} ({s})" for _, t, s in subs)
                         st.success(f"חלופה: {line}")
                     else:
                         st.warning("אין חלופה זמינה")
@@ -120,8 +120,6 @@ else:
     # אתחול session_state
     if 'step' not in st.session_state:
         st.session_state.step = 0
-        st.session_state.teacher = None
-        st.session_state.day = None
         st.session_state.history = []
 
     # עזרי צ'אט
@@ -149,12 +147,10 @@ else:
             bot(f"מצוין, בחרנו במורה **{teacher_choice}**.\n"
                 "עכשיו בחרי באיזה יום היא נעדרת:")
             st.session_state.step = 2
-            # אין צורך ב–experimental_rerun
 
     # שלב 2 – בחירת יום ושקלול תוצאות
     if st.session_state.step == 2:
-        day_choice = st.selectbox("בחרי יום:",
-                                  [""] + DAYS, key="day_sel")
+        day_choice = st.selectbox("בחרי יום:", [""] + DAYS, key="day_sel")
         if day_choice:
             st.session_state.day = day_choice
             user(day_choice)
@@ -174,7 +170,7 @@ else:
                     if subs is None:
                         reply += "▪️ אין צורך בחלופה\n"
                     elif subs:
-                        line = " / ".join(f\"{t} ({s})\" for _, t, s in subs)
+                        line = " / ".join(f"{t} ({s})" for _, t, s in subs)
                         reply += f"▪️ חלופה: {line}\n"
                     else:
                         reply += "▪️ אין חלופה זמינה\n"
