@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
-import numpy as np   # כבר הוספנו ל-requirements.txt
+import numpy as np
 
-# ────────────────── הגדרות עמוד + CSS מובייל ──────────────────
+# ────────────────── הגדרות עמוד + CSS ──────────────────
 st.set_page_config(page_title="בוט חלופות", layout="centered")
-
 st.markdown("""
 <style>
 h1 {font-size:1.4rem;}
@@ -18,17 +17,15 @@ DATA_FILE    = "schedule.csv"
 TEACHERS     = ['דנה', 'לילך', 'רעות', 'ליאת', 'לימור']
 PRIORITY_MAP = {'שהייה': 1, 'פרטני': 2}
 DAYS         = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי']
-COLOR_MAP    = {          # רקעים לטבלה
-    'שהייה':     '#c8e6c9',   # ירוק-בהיר
-    'פרטני':     '#bbdefb',   # כחול-בהיר
-    'יום חופשי': '#e0e0e0'    # אפור
-}
+DAY_OFF      = 'יום חופשי'
+COLOR_MAP    = {'שהייה':'#c8e6c9', 'פרטני':'#bbdefb', DAY_OFF:'#e0e0e0'}
 
 # ────────────────── טעינת נתונים ──────────────────
 @st.cache_data
 def load_table():
     df = pd.read_csv(DATA_FILE, dtype=str)
-    df['hour'] = df['hour'].astype(int)
+    df['hour']    = df['hour'].astype(int)
+    df['subject'] = df['subject'].str.strip()        # מסיר רווחים נסתרים
     return df
 
 df = load_table()
@@ -38,7 +35,7 @@ def teacher_matrix(data: pd.DataFrame, name: str) -> pd.DataFrame:
     sub = data[data.teacher == name]
     mat = sub.pivot_table(index='hour', columns='day',
                           values='subject', aggfunc='first')
-    return mat.reindex(index=range(1, 7), columns=DAYS)
+    return mat.reindex(index=range(1,7), columns=DAYS)
 
 def color_cells(val: str) -> str:
     for key, color in COLOR_MAP.items():
@@ -60,23 +57,20 @@ with tab_subs:
     if st.button("מצא חלופות", use_container_width=True):
         teacher_sched = df[(df.teacher == absent_teacher) & (df.day == day)]
 
-        # --- בדיקה: האם זה יום חופשי מלא? ---
-        if not teacher_sched.empty and (teacher_sched['subject'] == 'יום חופשי').all():
-            st.info(f"✋‎ {absent_teacher} ביום חופשי, אין צורך בחלופה.")
+        # --- אם כל השורות הן 'יום חופשי' → אין צורך בחלופה כלל ---
+        if not teacher_sched.empty and \
+           (teacher_sched['subject'] == DAY_OFF).all():
+            st.info(f"✋‎ {absent_teacher} ביום חופשי – אין צורך בחלופה.")
         else:
-            # תצוגת כותרת
             st.subheader(f"📌 המורה החסרה: {absent_teacher} | יום {day}")
+            absent_map = {r.hour: r.subject for _, r in teacher_sched.iterrows()}
 
-            # מילון {שעה → מקצוע}
-            absent_map = {row.hour: row.subject
-                          for _, row in teacher_sched.iterrows()}
-
-            # חיפוש חלופות לשעות 1-6
             for h in range(1, 7):
                 subject = absent_map.get(h, "—")
                 st.markdown(f"**🕐 שעה {h}: {subject}**")
 
-                if subject == "פרטני":
+                # גם 'פרטני' וגם 'יום חופשי' → מדלגים
+                if subject in ('פרטני', DAY_OFF):
                     st.info("אין צורך בחלופה")
                     continue
 
@@ -94,7 +88,7 @@ with tab_subs:
                 substitutes.sort(key=lambda x: (x[0], TEACHERS.index(x[1])))
 
                 if substitutes:
-                    line = " / ".join([f"{t} ({s})" for _, t, s in substitutes])
+                    line = " / ".join(f"{t} ({s})" for _, t, s in substitutes)
                     st.success(f"חלופה: {line}")
                 else:
                     st.warning("אין חלופה זמינה")
@@ -108,6 +102,5 @@ with tab_calendar:
     )
     for t in TEACHERS:
         with st.expander(f"📋 {t}", expanded=False):
-            mat = teacher_matrix(df, t)
-            styled = mat.style.applymap(color_cells)
+            styled = teacher_matrix(df, t).style.applymap(color_cells)
             st.dataframe(styled, use_container_width=True, height=240)
