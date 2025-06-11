@@ -171,7 +171,6 @@ else:
             bot(f"מצוין, בחרנו במורה **{teacher_choice}**.\n"
                 "עכשיו בחרי באיזה יום היא נעדרת:")
             st.session_state.step = 2
-            st.experimental_rerun()
 
     if st.session_state.step == 2:
         day_choice = st.selectbox(
