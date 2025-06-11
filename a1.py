@@ -2,34 +2,42 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# ────────────────── הגדרות עמוד + CSS ──────────────────
+# ─────────────── הגדרות עמוד + CSS ───────────────
 st.set_page_config(page_title="בוט חלופות", layout="centered")
-st.markdown("""
-<style>
-h1 {font-size:1.5rem;}
-button, select, input {font-size:1rem;}
-section[data-testid="stSidebar"] {display:none;}
-</style>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+    h1 {font-size:1.5rem;}
+    button, select, input {font-size:1rem;}
+    section[data-testid="stSidebar"] {display:none;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-# ────────────────── קבועים ──────────────────
+# ─────────────── קבועים ───────────────
 DATA_FILE    = "schedule.csv"
 TEACHERS     = ['דנה', 'לילך', 'רעות', 'ליאת', 'לימור']
 PRIORITY_MAP = {'שהייה': 1, 'פרטני': 2}
 DAYS         = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי']
 DAY_OFF      = 'יום חופשי'
-COLOR_MAP    = {'שהייה': '#c8e6c9', 'פרטני': '#bbdefb', DAY_OFF: '#e0e0e0'}
+COLOR_MAP    = {
+    'שהייה':  '#c8e6c9',     # ירוק-בהיר
+    'פרטני':  '#bbdefb',     # כחול-בהיר
+    DAY_OFF:  '#e0e0e0',     # אפור
+}
 
-# ────────────────── טעינת נתונים ──────────────────
+# ─────────────── טעינת נתונים ───────────────
 @st.cache_data
 def load_table() -> pd.DataFrame:
     df = pd.read_csv(DATA_FILE, dtype=str)
     df['hour']    = df['hour'].astype(int)
     df['subject'] = df['subject'].str.strip()
     return df
+
 df = load_table()
 
-# ────────────────── פונקציות עזר ──────────────────
+# ─────────────── פונקציות עזר ───────────────
 def teacher_matrix(data: pd.DataFrame, name: str) -> pd.DataFrame:
     sub = data[data.teacher == name]
     mat = sub.pivot_table(index='hour', columns='day',
@@ -43,16 +51,24 @@ def color_cells(val: str) -> str:
     return ''
 
 def find_substitutes(absent_teacher: str, day: str):
-    teacher_sched = df[(df.teacher == absent_teacher) & (df.day == day)]
-    if not teacher_sched.empty and (teacher_sched['subject'] == DAY_OFF).all():
+    """
+    מחזיר:
+      - "DAY_OFF" אם כל השעות של המורה ביום הזה = יום חופשי
+      - dict {hour: (subject, substitutes | None | [])}
+    """
+    ts = df[(df.teacher == absent_teacher) & (df.day == day)]
+    if not ts.empty and (ts['subject'] == DAY_OFF).all():
         return "DAY_OFF"
-    absent_map = {r.hour: r.subject for _, r in teacher_sched.iterrows()}
+
+    absent_map = {r.hour: r.subject for _, r in ts.iterrows()}
     results = {}
+
     for h in range(1, 7):
         subject = absent_map.get(h, "—")
         if subject in ('פרטני', DAY_OFF):
-            results[h] = (subject, None)
+            results[h] = (subject, None)              # None → אין צורך בחלופה
             continue
+
         subs = []
         for t in TEACHERS:
             if t == absent_teacher:
@@ -63,11 +79,13 @@ def find_substitutes(absent_teacher: str, day: str):
             status = rec.iloc[0]['subject']
             if status in PRIORITY_MAP:
                 subs.append((PRIORITY_MAP[status], t, status))
+
         subs.sort(key=lambda x: (x[0], TEACHERS.index(x[1])))
         results[h] = (subject, subs)
+
     return results
 
-# ────────────────── בחירת תצורה ──────────────────
+# ─────────────── בחירת תצורה ───────────────
 MODE = st.radio("בחר/י תצורה:", ["ממשק טפסים", "עוזר אישי (צ'אט)"])
 
 # =================================================
@@ -79,11 +97,13 @@ if MODE == "ממשק טפסים":
     # --- טאב חלופות ---
     with tab_subs:
         st.title("🧑‍🏫 בוט חלופות מורים")
+
         absent_teacher = st.selectbox("בחר/י מורה חסרה", TEACHERS)
         day            = st.selectbox("בחר/י יום בשבוע", DAYS)
 
         if st.button("מצא חלופות", use_container_width=True):
             res = find_substitutes(absent_teacher, day)
+
             if res == "DAY_OFF":
                 st.info(f"✋ {absent_teacher} בחופש ביום {day} – אין צורך בחלופה.")
             else:
@@ -91,6 +111,7 @@ if MODE == "ממשק טפסים":
                 for h in range(1, 7):
                     subj, subs = res[h]
                     st.markdown(f"**🕐 שעה {h}: {subj}**")
+
                     if subs is None:
                         st.info("אין צורך בחלופה")
                     elif subs:
@@ -123,10 +144,13 @@ else:
         st.session_state.history = []
 
     # עזרי צ'אט
-    def bot(msg):  st.session_state.history.append(("bot", msg))
-    def user(msg): st.session_state.history.append(("user", msg))
+    def bot(msg: str):
+        st.session_state.history.append(("bot", msg))
 
-    # הצגת היסטוריה
+    def user(msg: str):
+        st.session_state.history.append(("user", msg))
+
+    # הצגת ההיסטוריה
     for role, txt in st.session_state.history:
         with st.chat_message("assistant" if role == "bot" else "user"):
             st.markdown(txt)
@@ -139,23 +163,31 @@ else:
 
     # שלב 1 – בחירת מורה
     if st.session_state.step == 1:
-        teacher_choice = st.selectbox("בחרי מורה חסרה:",
-                                      [""] + TEACHERS, key="teacher_sel")
+        teacher_choice = st.selectbox(
+            "בחרי מורה חסרה:",
+            [""] + TEACHERS,
+            key="teacher_sel",
+        )
         if teacher_choice:
-            st.session_state.teacher = teacher_choice
             user(teacher_choice)
+            st.session_state.teacher = teacher_choice
             bot(f"מצוין, בחרנו במורה **{teacher_choice}**.\n"
                 "עכשיו בחרי באיזה יום היא נעדרת:")
             st.session_state.step = 2
 
-    # שלב 2 – בחירת יום ושקלול תוצאות
+    # שלב 2 – בחירת יום + חישוב תוצאה
     if st.session_state.step == 2:
-        day_choice = st.selectbox("בחרי יום:", [""] + DAYS, key="day_sel")
+        day_choice = st.selectbox(
+            "בחרי יום:",
+            [""] + DAYS,
+            key="day_sel",
+        )
         if day_choice:
-            st.session_state.day = day_choice
             user(day_choice)
+            st.session_state.day = day_choice
 
             res = find_substitutes(st.session_state.teacher, day_choice)
+
             if res == "DAY_OFF":
                 bot(f"✋ {st.session_state.teacher} בחופש ביום **{day_choice}** – "
                     "אין צורך במחליפה.")
@@ -178,8 +210,12 @@ else:
 
             bot("אם תרצי לבדוק שוב, בחרי מורה אחרת מהתיבה למעלה 😉")
 
-            # איפוס לשאילתה חדשה
+            # איפוס לפנייה חדשה
             st.session_state.step = 1
             for key in ('teacher_sel', 'day_sel'):
                 if key in st.session_state:
                     del st.session_state[key]
+
+            # רענון מיידי (אם נתמך) כדי שההודעה תוצג מיד
+            if hasattr(st, "experimental_rerun"):
+                st.experimental_rerun()
