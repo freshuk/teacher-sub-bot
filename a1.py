@@ -13,18 +13,36 @@ h1{font-size:1.8rem;font-weight:800;margin-bottom:0.4rem;display:inline;}
 .chat-user{background:#d2e1ff;}
 button,select,input,label{font-size:1rem;}
 section[data-testid="stSidebar"]{display:none;}
+
+/* שיפורים לנייד */
+@media (max-width: 768px) {
+    .stApp {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        min-height: 100vh;
+    }
+    h1 {
+        font-size: 1.5rem;
+    }
+    .chat-msg {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.95rem;
+    }
+    /* הוספת ריווח בתחתית לנייד */
+    .main > div {
+        padding-bottom: 100px !important;
+    }
+}
+
+/* הבטחת גלילה חלקה */
+html, body {
+    scroll-behavior: smooth;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ───────── אייקון קבוע ─────────
-if Path("bot_calendar.png").exists():
-    c1, c2 = st.columns([1, 9])
-    with c1: 
-        st.image("bot_calendar.png", width=60)
-    with c2: 
-        st.markdown("### צמרובוט – העוזר האישי שלי")
-else:
-    st.title("🤖 צמרובוט – העוזר האישי שלי")
+# ───────── כותרת ─────────
+st.title("🤖 צמרובוט – העוזר האישי שלי")
 
 # ───────── נתונים וקבועים ─────────
 DATA = "schedule.csv"
@@ -198,5 +216,59 @@ if st.button("🗑️ נקה מסך"):
     st.session_state.clear()
     st.rerun()
 
-# ───────── גלילה אוטומטית גלובלית ─────────
-components.html("<script>window.scrollTo(0, document.body.scrollHeight);</script>", height=0)
+# ───────── גלילה אוטומטית משופרת ─────────
+components.html("""
+<script>
+    // פונקציית גלילה משופרת לנייד
+    function scrollToBottom() {
+        try {
+            // כל האפשרויות לגלילה
+            const targets = [
+                window.parent.document.querySelector('[data-testid="stAppViewContainer"] > div'),
+                window.parent.document.querySelector('section.main > div'),
+                window.parent.document.querySelector('[data-testid="stVerticalBlock"]'),
+                window.parent.document.querySelector('.main'),
+                window.parent.document.body,
+                document.body
+            ];
+            
+            targets.forEach(target => {
+                if (target) {
+                    target.scrollTop = target.scrollHeight;
+                }
+            });
+            
+            // גלילה של החלון עצמו
+            window.scrollTo(0, document.body.scrollHeight);
+            if (window.parent) {
+                window.parent.scrollTo(0, window.parent.document.body.scrollHeight);
+            }
+        } catch (e) {
+            console.log('Scroll error:', e);
+        }
+    }
+    
+    // הפעלה מיידית ומושהית
+    scrollToBottom();
+    setTimeout(scrollToBottom, 200);
+    setTimeout(scrollToBottom, 500);
+    setTimeout(scrollToBottom, 1000);
+    
+    // MutationObserver לגלילה אוטומטית בשינויים
+    try {
+        const targetNode = window.parent.document.body;
+        const config = { childList: true, subtree: true };
+        let scrollTimeout;
+        
+        const callback = function(mutationsList) {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(scrollToBottom, 100);
+        };
+        
+        const observer = new MutationObserver(callback);
+        observer.observe(targetNode, config);
+    } catch (e) {
+        console.log('Observer error:', e);
+    }
+</script>
+""", height=0)
