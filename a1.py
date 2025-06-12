@@ -52,8 +52,8 @@ def render_chat():
         cls="chat-msg chat-user" if r=="user" else "chat-msg"
         st.markdown(f"<div class='{cls}'>{m}</div>",unsafe_allow_html=True)
 
-st.container().markdown("")  # placeholder
-render_chat()
+# === שינוי 1: יצירת מיכל ריק עבור הצ'אט ===
+chat_container = st.container()
 
 # ───────── substitute fn ─────────
 def find_subs(t,day,start):
@@ -92,24 +92,31 @@ def choose_day():
         add("user",d)
         st.session_state.day=d
         st.session_state.stage="scope"
-        add("bot","היא נעדרת **יום שלם** או **מ-שעה**?")
+        add("bot","**היא נעדרת **יום שלם** או **מ-שעה**?**")
         st.session_state.done_day=d
         st.session_state.sel_day=""
 
 def choose_scope():
     sc=st.session_state.sel_scope
+    if not sc: return # מונע ריצה כפולה כשה-radio מתאפס
+    
     if sc=="יום שלם":
+        add("user", "יום שלם")
         st.session_state.start=1
-        st.session_state.sel_scope=""
         calculate()
     elif sc=="מ-שעה":
-        add("bot","בחרי שעת התחלה (1-6):")
+        add("user", "מ-שעה")
+        # השאלה על השעה תופיע בהצגת הווידג'טים
+        pass
+    st.session_state.sel_scope = ""
+
 
 def choose_hour():
     hr=st.session_state.sel_hr
     if hr:
         add("user",f"מהשעה {hr}")
-        st.session_state.start=int(hr); st.session_state.sel_hr=""
+        st.session_state.start=int(hr)
+        st.session_state.sel_hr=""
         calculate()
 
 def calculate():
@@ -127,23 +134,37 @@ def calculate():
         add("bot",txt)
     add("bot","שמחתי לעזור! תמיד כאן לשירותך, צמרובוט 🌸")
     st.session_state.stage="teacher"
-    st.session_state.done_teacher=st.session_state.done_day=""
+    st.session_state.done_teacher=""
+    st.session_state.done_day=""
+
 
 # ───────── dynamic widgets ─────────
 if st.session_state.stage=="teacher":
-    st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher)
+    st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher, label_visibility="collapsed")
 elif st.session_state.stage=="day":
-    st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day)
+    st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day, label_visibility="collapsed")
 elif st.session_state.stage=="scope":
-    st.radio("היעדרות:",("","יום שלם","מ-שעה"),key="sel_scope",on_change=choose_scope)
-    if st.session_state.sel_scope=="מ-שעה":
-        st.selectbox("שעת התחלה (1-6):",[""]+[str(i) for i in range(1,7)],
-                     key="sel_hr",on_change=choose_hour)
+    # הוספתי הודעה של הבוט לפני הצגת האפשרויות
+    add("bot","בחרי היעדרות: יום שלם או החל משעה מסויימת?")
+    st.radio("היעדרות:",("יום שלם","מ-שעה"),key="sel_scope",on_change=choose_scope, index=None)
+
+    # המצב הזה נבדק עכשיו אחרי ה-radio
+    if 'start' not in st.session_state or st.session_state.start is None:
+        if st.session_state.get('sel_scope_user_choice') == "מ-שעה":
+            add("bot","בחרי שעת התחלה (1-6):")
+            st.selectbox("שעת התחלה (1-6):",[""]+[str(i) for i in range(1,7)],
+                         key="sel_hr",on_change=choose_hour, label_visibility="collapsed")
+
+# === שינוי 2: הצגת הצ'אט בתוך המיכל, בסוף הלוגיקה ===
+with chat_container:
+    render_chat()
+
 
 # ───────── ניקוי מסך ─────────
 st.divider()
 if st.button("🗑️ נקה מסך"):
-    st.session_state.clear()
+    for key in st.session_state.keys():
+        del st.session_state[key]
     st.rerun()
 
 # ───────── גלילה אוטומטית גלובלית ─────────
