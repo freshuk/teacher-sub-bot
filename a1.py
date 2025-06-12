@@ -3,34 +3,39 @@ import pandas as pd
 import time
 from pathlib import Path
 
-# ───────── הגדרות עמוד + CSS מקצועי ─────────
+# ───────── הגדרות עמוד ─────────
 st.set_page_config(
     page_title="צמרובוט – העוזר האישי שלי",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
+# ───────── CSS מקצועי ─────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
 
-/* Global Styles */
-* {
-    font-family: 'Heebo', sans-serif !important;
-}
-
 html, body, [class*="css"] {
+    font-family: 'Heebo', sans-serif !important;
     direction: rtl;
     text-align: right;
 }
 
 .main .block-container {
     padding-top: 2rem;
-    padding-bottom: 2rem;
     max-width: 42rem;
 }
 
-/* Header Styles */
+section[data-testid="stSidebar"] { display: none; }
+.stDeployButton { display: none; }
+footer { display: none; }
+header { display: none; }
+</style>
+""", unsafe_allow_html=True)
+
+# CSS נוסף - חלק 2
+st.markdown("""
+<style>
 .app-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     padding: 1.5rem;
@@ -45,7 +50,6 @@ html, body, [class*="css"] {
     font-size: 1.8rem;
     font-weight: 700;
     margin: 0;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .app-subtitle {
@@ -54,7 +58,6 @@ html, body, [class*="css"] {
     margin-top: 0.5rem;
 }
 
-/* Chat Container */
 .chat-container {
     background: #ffffff;
     border-radius: 20px;
@@ -65,10 +68,13 @@ html, body, [class*="css"] {
     min-height: 300px;
     max-height: 500px;
     overflow-y: auto;
-    position: relative;
 }
+</style>
+""", unsafe_allow_html=True)
 
-/* Chat Messages */
+# CSS חלק 3 - הודעות צ'אט
+st.markdown("""
+<style>
 .chat-msg {
     margin: 1rem 0;
     animation: fadeInUp 0.5s ease-out;
@@ -111,8 +117,12 @@ html, body, [class*="css"] {
     box-shadow: 0 2px 12px rgba(102, 126, 234, 0.2);
     text-align: right;
 }
+</style>
+""", unsafe_allow_html=True)
 
-/* Thinking Animation */
+# CSS חלק 4 - אנימציות ואלמנטים
+st.markdown("""
+<style>
 .thinking-indicator {
     display: flex;
     align-items: center;
@@ -152,7 +162,25 @@ html, body, [class*="css"] {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Control Panel */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(102, 126, 234, 0.3);
+    border-radius: 50%;
+    border-top-color: #667eea;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+""", unsafe_allow_html=True)
+
+# CSS חלק 5 - פאנל בקרה וכפתורים
+st.markdown("""
+<style>
 .control-panel {
     background: linear-gradient(135deg, #f8faff 0%, #ffffff 100%);
     border-radius: 20px;
@@ -172,7 +200,6 @@ html, body, [class*="css"] {
     gap: 0.5rem;
 }
 
-/* Form Elements */
 .stSelectbox > div > div {
     background: white;
     border: 2px solid #e1e8f7;
@@ -180,38 +207,6 @@ html, body, [class*="css"] {
     transition: all 0.3s ease;
 }
 
-.stSelectbox > div > div:focus-within {
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.stRadio > div {
-    gap: 1rem;
-}
-
-.stRadio > div > label {
-    background: white;
-    border: 2px solid #e1e8f7;
-    border-radius: 12px;
-    padding: 0.8rem 1.2rem;
-    margin: 0.2rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-weight: 500;
-}
-
-.stRadio > div > label:hover {
-    border-color: #667eea;
-    background: #f8faff;
-}
-
-.stRadio > div > label[data-checked="true"] {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: #667eea;
-}
-
-/* Buttons */
 .stButton > button {
     background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
     color: white;
@@ -219,99 +214,18 @@ html, body, [class*="css"] {
     border-radius: 12px;
     padding: 0.8rem 1.5rem;
     font-weight: 600;
-    transition: all 0.3s ease;
     box-shadow: 0 4px 15px rgba(255, 107, 107, 0.2);
     width: 100%;
 }
 
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
-}
-
-/* Responsive Design */
 @media (max-width: 768px) {
-    .main .block-container {
-        padding: 1rem;
-    }
-    
-    .app-header {
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
-    
-    .app-title {
-        font-size: 1.5rem;
-    }
-    
-    .chat-container {
-        padding: 1rem;
-        max-height: 400px;
-    }
-    
-    .chat-bot {
-        margin-left: 1rem;
-    }
-    
-    .chat-user {
-        margin-right: 1rem;
-    }
-    
-    .control-panel {
-        padding: 1rem;
-    }
-}
-
-/* Hide Streamlit Elements */
-section[data-testid="stSidebar"] { display: none; }
-.stDeployButton { display: none; }
-footer { display: none; }
-header { display: none; }
-
-/* Custom Scrollbar */
-.chat-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.chat-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-.chat-container::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 10px;
-}
-
-.chat-container::-webkit-scrollbar-thumb:hover {
-    background: #5a67d8;
-}
-
-/* Loading Spinner */
-.loading-spinner {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(102, 126, 234, 0.3);
-    border-radius: 50%;
-    border-top-color: #667eea;
-    animation: spin 1s ease-in-out infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* Success Animation */
-.success-icon {
-    display: inline-block;
-    animation: bounce 0.6s ease-in-out;
-}
-
-@keyframes bounce {
-    0%, 20%, 60%, 100% { transform: translateY(0); }
-    40% { transform: translateY(-10px); }
-    80% { transform: translateY(-5px); }
+    .main .block-container { padding: 1rem; }
+    .app-header { padding: 1rem; margin-bottom: 1rem; }
+    .app-title { font-size: 1.5rem; }
+    .chat-container { padding: 1rem; max-height: 400px; }
+    .chat-bot { margin-left: 1rem; }
+    .chat-user { margin-right: 1rem; }
+    .control-panel { padding: 1rem; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -366,7 +280,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ───────── אתחול צ'אט ─────────
-GREET = "שלום גלית! 👋 אני צמרובוט, העוזר האישי שלך.\n\nאני כאן לעזור לך למצוא מורה מחליפה במהירות ובקלות. בואי נתחיל!"
+GREET = "שלום גלית! 👋 אני צמרובוט, העוזר האישי שלך.<br><br>אני כאן לעזור לך למצוא מורה מחליפה במהירות ובקלות. בואי נתחיל!"
 
 if 'chat' not in st.session_state:
     st.session_state.chat = [("bot", GREET)]
@@ -374,7 +288,6 @@ if 'chat' not in st.session_state:
     st.session_state.teacher = st.session_state.day = ""
     st.session_state.start = 1
     st.session_state.sel_teacher = st.session_state.sel_day = st.session_state.sel_scope = st.session_state.sel_hr = ""
-    st.session_state.thinking = False
 
 def bot(m):
     st.session_state.chat.append(("bot", m))
@@ -396,7 +309,7 @@ def show_thinking():
         </div>
     </div>
     """, unsafe_allow_html=True)
-    time.sleep(1.5)  # זמן חשיבה
+    time.sleep(1.5)
     thinking_placeholder.empty()
 
 def redraw():
@@ -411,17 +324,15 @@ def redraw():
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                # המרת **bold** ל-HTML
-                formatted_msg = msg.replace('**', '<strong>').replace('**', '</strong>')
                 st.markdown(f"""
                 <div class="chat-msg">
-                    <div class="chat-bot">{formatted_msg}</div>
+                    <div class="chat-bot">{msg}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
 # ───────── תצוגת צ'אט ─────────
-chat_container = st.container()
 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+chat_container = st.container()
 redraw()
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -472,13 +383,13 @@ def run():
     
     if res == "DAY_OFF":
         bot(f"""
-        <div class="success-icon">✋</div> מצוין! 
+        ✋ מצוין! 
         <strong>{st.session_state.teacher}</strong> נמצאת בחופש ביום <strong>{st.session_state.day}</strong><br>
         <strong>אין צורך בחלופה</strong> 🎉
         """)
     else:
         ans = f"""
-        <div class="success-icon">📋</div> הנה החלופות למורה <strong>{st.session_state.teacher}</strong> ביום <strong>{st.session_state.day}</strong>:<br><br>
+        📋 הנה החלופות למורה <strong>{st.session_state.teacher}</strong> ביום <strong>{st.session_state.day}</strong>:<br><br>
         """
         
         for h in range(st.session_state.start, 7):
