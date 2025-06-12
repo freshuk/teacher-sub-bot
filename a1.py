@@ -2,158 +2,189 @@ import streamlit as st
 import pandas as pd
 import time
 
-# ───────── הגדרות עמוד + CSS ─────────
-st.set_page_config(page_title="צמרובוט – עוזר חלופות", layout="centered")
+# ─────────────────── הגדרות עמוד + CSS ───────────────────
+st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-h1{font-size:1.7rem;font-weight:800;}
-button,select,input{font-size:1rem;}
-.chat-bubble{background:#f1f3f6;border-radius:12px;padding:0.6rem 0.9rem;margin:0.2rem 0;}
-.user-bubble{background:#d1e7ff;}
+h1{font-size:1.7rem;font-weight:800;margin-bottom:0.3rem;}
+.chat-msg{background:#f1f3f6;border-radius:14px;padding:0.65rem 0.9rem;margin:0.25rem 0;}
+.chat-user{background:#d1e7ff;}
+button,select,input,textarea{font-size:1rem;}
 section[data-testid="stSidebar"]{display:none;}
 </style>
-""",unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# ───────── נתונים וקבועים ─────────
-DATA_FILE="schedule.csv"
-TEACHERS  = ['דנה','לילך','רעות','ליאת','לימור']
+# ─────────────────── נתונים וקבועים ──────────────────────
+DATA_FILE = "schedule.csv"
+TEACHERS  = ['דנה', 'לילך', 'רעות', 'ליאת', 'לימור']
 DAYS      = ['ראשון','שני','שלישי','רביעי','חמישי','שישי']
 DAY_OFF   = 'יום חופשי'
 PRIORITY  = {'שהייה':1,'פרטני':2}
 
 @st.cache_data
-def load_df():
-    df=pd.read_csv(DATA_FILE,dtype=str)
-    df['hour']=df['hour'].astype(int)
-    df['subject']=df['subject'].str.strip()
+def load_table():
+    df = pd.read_csv(DATA_FILE, dtype=str)
+    df['hour'] = df['hour'].astype(int)
+    df['subject'] = df['subject'].str.strip()
     return df
-df=load_df()
+df = load_table()
 
-def find_subs(tchr,day,start_hr):
-    rows=df[(df.teacher==tchr)&(df.day==day)]
-    if not rows.empty and (rows.subject==DAY_OFF).all():
+# ─────────────────── חישוב חלופות ───────────────────────
+def find_substitutes(absent_teacher: str, day: str, start_hour: int):
+    rows = df[(df.teacher == absent_teacher) & (df.day == day)]
+    if not rows.empty and (rows.subject == DAY_OFF).all():
         return "DAY_OFF"
-    absent={r.hour:r.subject for _,r in rows.iterrows()}
-    out={}
-    for h in range(start_hr,7):
-        subj=absent.get(h,'—')
-        if subj in ('פרטני',DAY_OFF):
-            out[h]=(subj,None); continue
-        opts=[]
+    absent = {r.hour: r.subject for _, r in rows.iterrows()}
+    res = {}
+    for h in range(start_hour, 7):
+        subj = absent.get(h, "—")
+        if subj in ('פרטני', DAY_OFF):
+            res[h] = (subj, None)
+            continue
+        opts = []
         for t in TEACHERS:
-            if t==tchr: continue
-            r=df[(df.teacher==t)&(df.day==day)&(df.hour==h)]
-            if r.empty: continue
-            stat=r.iloc[0].subject
-            if stat in PRIORITY:
-                opts.append((PRIORITY[stat],t,stat))
-        opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
-        out[h]=(subj,opts)
-    return out
+            if t == absent_teacher:
+                continue
+            r = df[(df.teacher == t) & (df.day == day) & (df.hour == h)]
+            if r.empty:
+                continue
+            status = r.iloc[0].subject
+            if status in PRIORITY:
+                opts.append((PRIORITY[status], t, status))
+        opts.sort(key=lambda x: (x[0], TEACHERS.index(x[1])))
+        res[h] = (subj, opts)
+    return res
 
-# ────────────────────────────────────────────────
-#   (מצב טפסים הישן – אם תרצי להחזיר, הסירי את ה‑comment)
-# ------------------------------------------------
-# def forms_mode():
-#     ...
-# ------------------------------------------------
+# ─────────────────── צמרובוט – עוזר אישי ─────────────────
+st.title("🤖 צמרובוט – העוזר האישי שלי")
 
-# ───────── צמרובוט – עוזר אישי (צ'אט) ─────────
-st.title("🤖 צמרובוט – העוזר האישי שלי")
+GREETING = "שלום גלית! אני צמרובוט, העוזר האישי שלך 😊\nבמה אני יכול לעזור לך היום?"
 
-GREET = "שלום גלית! אני צמרובוט, העוזר האישי שלך 😊\nבמה אני יכול לעזור לך היום?"
+# --------------- Session init ---------------
 if 'chat' not in st.session_state:
-    st.session_state.chat=[("bot",GREET)]
-    st.session_state.stage="teacher"
+    st.session_state.chat   = []
+    st.session_state.stage  = "teacher"
+    st.session_state.teacher= ""
+    st.session_state.day    = ""
+    st.session_state.scope  = "יום שלם"
+    st.session_state.start  = 1
+    st.session_state.greeted = False
 
-def bot(txt):
-    st.session_state.chat.append(("bot",txt))
-def user(txt):
-    st.session_state.chat.append(("user",txt))
+# ברכה יחידה
+if not st.session_state.greeted:
+    st.session_state.chat.append(("bot", GREETING))
+    st.session_state.greeted = True
 
-# --- הצגת צ'אט ---
-msg_area=st.container()
+# ---------- פונקציות עזר לצ’אט ----------
+def bot(msg):
+    st.session_state.chat.append(("bot", msg))
+def user(msg):
+    st.session_state.chat.append(("user", msg))
+
+# ---------- ציור צ’אט ----------
+chat_area = st.container()
 def redraw():
-    msg_area.empty()
-    for role,txt in st.session_state.chat:
-        with msg_area.chat_message("assistant" if role=="bot" else "user"):
-            st.markdown(txt,unsafe_allow_html=True)
+    chat_area.empty()
+    for role, txt in st.session_state.chat:
+        css = "chat-msg chat-user" if role=="user" else "chat-msg"
+        with chat_area:
+            st.markdown(f"<div class='{css}'>{txt}</div>", unsafe_allow_html=True)
 redraw()
 
-# --- callbacks ---
-def choose_teacher():
-    t=st.session_state.sel_teacher
+# ---------- Callbacks ----------
+def on_choose_teacher():
+    t = st.session_state.sel_teacher
     if t:
         user(t)
-        st.session_state.teacher=t
-        st.session_state.stage="day"
-        bot("בחרת **{}**.\nלאיזה יום מדובר?".format(t))
+        st.session_state.teacher = t
+        st.session_state.stage   = "day"
+        bot("מעולה, בחרנו במורה **{}**.\nלאיזה יום היא נעדרת?".format(t))
         redraw()
 
-def choose_day():
-    d=st.session_state.sel_day
+def on_choose_day():
+    d = st.session_state.sel_day
     if d:
         user(d)
-        st.session_state.day=d
-        st.session_state.stage="scope"
-        bot("האם המורה נעדרת כל היום או החל משעה מסוימת?")
+        st.session_state.day  = d
+        st.session_state.stage= "scope"
+        bot("האם היא נעדרת **יום שלם** או החל **משעה מסוימת**?")
         redraw()
 
-def choose_scope():
-    scope=st.session_state.abs_scope
-    st.session_state.scope=scope
-    if scope=="יום שלם":
-        start_hr=1
-        process(start_hr)
-    # אם בחרו 'מ‑שעה' – תוצג מיד Select נוסף לבחירת שעה
-
-def choose_start_hour():
-    hr=st.session_state.sel_hour
-    if hr:
-        process(int(hr))
-
-def process(start_hr:int):
-    with st.spinner("צמרובוט חושב…"):
-        time.sleep(2)           # סימולציית דיבור
-        res=find_subs(st.session_state.teacher,st.session_state.day,start_hr)
-    if res=="DAY_OFF":
-        bot(f"✋ {st.session_state.teacher} בחופש ביום **{st.session_state.day}** – "
-            "אין צורך בחלופה.")
+def on_choose_scope():
+    scope = st.session_state.sel_scope
+    st.session_state.scope = scope
+    if scope == "יום שלם":
+        st.session_state.start = 1
+        process()
     else:
-        ans=f"להלן החלופות למורה **{st.session_state.teacher}** ביום **{st.session_state.day}**:\n"
-        for h in range(start_hr,7):
-            subj,subs=res[h]
-            ans+=f"\n**🕐 שעה {h}** – {subj}\n"
+        redraw()   # מצייר Select שעה
+
+def on_choose_hour():
+    hr = st.session_state.sel_hr
+    if hr:
+        st.session_state.start = int(hr)
+        user(f"מהשעה {hr}")
+        process()
+
+def process():
+    with st.spinner("צמרובוט חושב…"):
+        time.sleep(1.8)
+        res = find_substitutes(st.session_state.teacher,
+                               st.session_state.day,
+                               st.session_state.start)
+    if res == "DAY_OFF":
+        bot(f"✋ {st.session_state.teacher} בחופש ביום **{st.session_state.day}** – אין צורך בחלופה.")
+    else:
+        ans = f"להלן החלופות למורה **{st.session_state.teacher}** ביום **{st.session_state.day}**:\n"
+        for h in range(st.session_state.start, 7):
+            subj, subs = res[h]
+            ans += f"\n**🕐 שעה {h}** – {subj}\n"
             if subs is None:
-                ans+="▪️ אין צורך בחלופה\n"
+                ans += "▪️ אין צורך בחלופה\n"
             elif subs:
-                line=" / ".join(f"{t} ({s})" for _,t,s in subs)
-                ans+=f"▪️ חלופה: {line}\n"
+                line = " / ".join(f"{t} ({s})" for _, t, s in subs)
+                ans += f"▪️ חלופה: {line}\n"
             else:
-                ans+="▪️ אין חלופה זמינה\n"
+                ans += "▪️ אין חלופה זמינה\n"
         bot(ans)
-    bot("מקווה שעזרתי לך! צריכה פתרונות נוספים? שיהיה לך המשך יום נפלא 🌸")
-    # reset
-    st.session_state.stage="teacher"
-    st.session_state.sel_teacher=""
-    st.session_state.sel_day=""
-    st.session_state.abs_scope=""
-    st.session_state.sel_hour=""
+    bot("מקווה שעזרתי לך! את צריכה פתרונות נוספים?\nשיהיה לך המשך יום נפלא 🌸")
+
+    # reset לשאילתה הבאה
+    st.session_state.stage   = "teacher"
+    st.session_state.sel_teacher = ""
+    st.session_state.sel_day     = ""
+    st.session_state.sel_scope   = "יום שלם"
+    st.session_state.sel_hr      = ""
     redraw()
 
-# --- UI דינמי ---
-if st.session_state.stage=="teacher":
-    st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,
-                 key="sel_teacher", on_change=choose_teacher)
+# ---------- UI דינמי ----------
+if st.session_state.stage == "teacher":
+    st.selectbox("בחרי מורה חסרה:",
+                 [""] + TEACHERS,
+                 key="sel_teacher",
+                 on_change=on_choose_teacher)
 
-elif st.session_state.stage=="day":
-    st.selectbox("בחרי יום:",[""]+DAYS,
-                 key="sel_day", on_change=choose_day)
+elif st.session_state.stage == "day":
+    st.selectbox("בחרי יום:",
+                 [""] + DAYS,
+                 key="sel_day",
+                 on_change=on_choose_day)
 
-elif st.session_state.stage=="scope":
-    st.radio("היעדרות:",["יום שלם","מ‑שעה"],
-             key="abs_scope", on_change=choose_scope)
-    if st.session_state.get("abs_scope")=="מ‑שעה":
-        st.selectbox("בחרי שעת התחלה (1‑6):",
-                     [""]+[str(i) for i in range(1,7)],
-                     key="sel_hour", on_change=choose_start_hour)
+elif st.session_state.stage == "scope":
+    st.radio("היעדרות:", ["יום שלם", "מ-שעה"],
+             key="sel_scope",
+             on_change=on_choose_scope)
+    if st.session_state.sel_scope == "מ-שעה":
+        st.selectbox("בחרי שעת התחלה (1-6):",
+                     [""] + [str(i) for i in range(1, 7)],
+                     key="sel_hr",
+                     on_change=on_choose_hour)
+
+# =========================================================
+#  ☑ מצב הטפסים הישן נשמר למטה כ-Comment – להחזרה מהירה
+# =========================================================
+"""
+### מצב טפסים היסטורי
+# def forms_mode():
+#     ...
+"""
