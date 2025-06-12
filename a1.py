@@ -132,7 +132,9 @@ def choose_hour():
         calculate()
 
 def calculate():
-    with st.spinner("צמרובוט חושב…"): 
+    # השתמש ב-toast במקום spinner כדי למנוע רענון של הדף
+    with st.empty():
+        st.toast("צמרובוט חושב... 🤖", icon="⏳")
         time.sleep(1.1)
     
     res = find_subs(st.session_state.teacher, st.session_state.day, st.session_state.start)
