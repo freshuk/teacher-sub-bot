@@ -6,40 +6,49 @@ import streamlit.components.v1 as components
 
 # ───────── הגדרות בסיס + CSS ─────────
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
-st.markdown("""
-<style>
-h1{font-size:1.8rem;font-weight:800;margin-bottom:0.4rem;display:inline;}
-.chat-msg{background:#f5f8ff;border-radius:14px;padding:0.7rem 1rem;margin:0.3rem 0;}
-.chat-user{background:#d2e1ff;}
-button,select,input,label{font-size:1rem;}
-section[data-testid="stSidebar"]{display:none;}
 
-/* שיפורים לנייד */
-@media (max-width: 768px) {
-    .stApp {
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        min-height: 100vh;
+# CSS עם cache כדי למנוע רענון
+if 'css_loaded' not in st.session_state:
+    st.session_state.css_loaded = True
+    st.markdown("""
+    <style>
+    h1{font-size:1.8rem;font-weight:800;margin-bottom:0.4rem;display:inline;}
+    .chat-msg{background:#f5f8ff;border-radius:14px;padding:0.7rem 1rem;margin:0.3rem 0;}
+    .chat-user{background:#d2e1ff;}
+    button,select,input,label{font-size:1rem;}
+    section[data-testid="stSidebar"]{display:none;}
+    
+    /* שיפורים לנייד */
+    @media (max-width: 768px) {
+        .stApp {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            min-height: 100vh;
+        }
+        h1 {
+            font-size: 1.5rem;
+        }
+        .chat-msg {
+            padding: 0.6rem 0.8rem;
+            font-size: 0.95rem;
+        }
+        /* הוספת ריווח בתחתית לנייד */
+        .main > div {
+            padding-bottom: 100px !important;
+        }
     }
-    h1 {
-        font-size: 1.5rem;
+    
+    /* הבטחת גלילה חלקה */
+    html, body {
+        scroll-behavior: smooth;
     }
-    .chat-msg {
-        padding: 0.6rem 0.8rem;
-        font-size: 0.95rem;
+    
+    /* הסתרת ה-toast indicator */
+    .stToast {
+        transition: opacity 0.5s ease-out;
     }
-    /* הוספת ריווח בתחתית לנייד */
-    .main > div {
-        padding-bottom: 100px !important;
-    }
-}
-
-/* הבטחת גלילה חלקה */
-html, body {
-    scroll-behavior: smooth;
-}
-</style>
-""", unsafe_allow_html=True)
+    </style>
+    """, unsafe_allow_html=True)
 
 # ───────── כותרת ─────────
 st.title("🤖 צמרובוט – העוזר האישי שלי")
@@ -51,11 +60,15 @@ DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שי�
 DAY_OFF = 'יום חופשי'
 PRIORITY = {'שהייה': 1, 'פרטני': 2}
 
-@st.cache_data
+# טעינת נתונים ללא cache_data (מניעת TokenError)
 def load_data():
-    d = pd.read_csv(DATA, dtype=str)
-    d['hour'] = d['hour'].astype(int)
-    return d
+    try:
+        d = pd.read_csv(DATA, dtype=str)
+        d['hour'] = d['hour'].astype(int)
+        return d
+    except:
+        # יצירת DataFrame ריק אם הקובץ לא קיים
+        return pd.DataFrame(columns=['teacher', 'day', 'hour', 'subject'])
 
 df = load_data()
 
@@ -65,11 +78,14 @@ if "chat" not in st.session_state:
     st.session_state.stage = "teacher"
     st.session_state.done_teacher = ""
     st.session_state.done_day = ""
+    st.session_state.is_calculating = False
+    st.session_state.last_scroll_time = 0
 
 # ───────── chat helpers ─────────
 def add(role, msg):
     if not st.session_state.chat or st.session_state.chat[-1] != (role, msg):
         st.session_state.chat.append((role, msg))
+        st.session_state.last_scroll_time = time.time()
 
 def render_chat():
     for r, m in st.session_state.chat:
@@ -134,7 +150,8 @@ def choose_scope():
         add("user", "יום שלם")
         st.session_state.start = 1
         st.session_state.sel_scope = ""
-        calculate()
+        st.session_state.is_calculating = True
+        st.rerun()
     elif sc == "מ-שעה":
         add("user", "מ-שעה")
         st.session_state.stage = "hour"
@@ -147,13 +164,19 @@ def choose_hour():
         add("user", f"מהשעה {hr}")
         st.session_state.start = int(hr)
         st.session_state.sel_hr = ""
-        calculate()
+        st.session_state.is_calculating = True
+        st.rerun()
 
 def calculate():
-    # השתמש ב-toast במקום spinner כדי למנוע רענון של הדף
-    with st.empty():
-        st.toast("צמרובוט חושב... 🤖", icon="⏳")
-        time.sleep(1.1)
+    # הצגת הודעת חישוב בצורה נקייה
+    calc_container = st.empty()
+    with calc_container.container():
+        st.info("צמרובוט חושב... 🤖")
+    
+    time.sleep(1.1)
+    
+    # מחיקת הודעת החישוב
+    calc_container.empty()
     
     res = find_subs(st.session_state.teacher, st.session_state.day, st.session_state.start)
     
@@ -176,9 +199,14 @@ def calculate():
     st.session_state.stage = "teacher"
     st.session_state.done_teacher = ""
     st.session_state.done_day = ""
+    st.session_state.is_calculating = False
 
-# ───────── יצירת containers ─────────
-# יצירת container ראשי
+# ───────── Main App Logic ─────────
+# בדיקה אם צריך לחשב
+if st.session_state.get('is_calculating', False):
+    calculate()
+
+# יצירת containers ראשיים
 main_container = st.container()
 
 with main_container:
@@ -203,7 +231,7 @@ with main_container:
                         key="sel_day", on_change=choose_day)
                         
         elif st.session_state.stage == "scope":
-            st.radio("היעדרות:", ("", "יום שלם", "מ-שעה"), 
+            st.radio("היעדרות:", ["", "יום שלם", "מ-שעה"], 
                     key="sel_scope", on_change=choose_scope)
                     
         elif st.session_state.stage == "hour":
@@ -217,58 +245,51 @@ if st.button("🗑️ נקה מסך"):
     st.rerun()
 
 # ───────── גלילה אוטומטית משופרת ─────────
-components.html("""
-<script>
-    // פונקציית גלילה משופרת לנייד
-    function scrollToBottom() {
-        try {
-            // כל האפשרויות לגלילה
-            const targets = [
-                window.parent.document.querySelector('[data-testid="stAppViewContainer"] > div'),
-                window.parent.document.querySelector('section.main > div'),
-                window.parent.document.querySelector('[data-testid="stVerticalBlock"]'),
-                window.parent.document.querySelector('.main'),
-                window.parent.document.body,
-                document.body
-            ];
-            
-            targets.forEach(target => {
-                if (target) {
-                    target.scrollTop = target.scrollHeight;
-                }
-            });
-            
-            // גלילה של החלון עצמו
-            window.scrollTo(0, document.body.scrollHeight);
-            if (window.parent) {
-                window.parent.scrollTo(0, window.parent.document.body.scrollHeight);
+# גלילה רק אם עברו לפחות 100ms מהעדכון האחרון
+if time.time() - st.session_state.get('last_scroll_time', 0) < 2:
+    components.html("""
+    <script>
+        // פונקציית גלילה משופרת לנייד
+        function scrollToBottom() {
+            try {
+                // גלילה לתחתית בכל הדרכים האפשריות
+                const methods = [
+                    () => window.scrollTo(0, document.body.scrollHeight),
+                    () => window.parent.scrollTo(0, window.parent.document.body.scrollHeight),
+                    () => {
+                        const container = window.parent.document.querySelector('[data-testid="stAppViewContainer"] > div');
+                        if (container) container.scrollTop = container.scrollHeight;
+                    },
+                    () => {
+                        const main = window.parent.document.querySelector('.main');
+                        if (main) main.scrollTop = main.scrollHeight;
+                    },
+                    () => {
+                        const stApp = window.parent.document.querySelector('.stApp');
+                        if (stApp) stApp.scrollTop = stApp.scrollHeight;
+                    }
+                ];
+                
+                methods.forEach(method => {
+                    try { method(); } catch (e) {}
+                });
+                
+            } catch (e) {
+                console.log('Scroll error:', e);
             }
-        } catch (e) {
-            console.log('Scroll error:', e);
         }
-    }
-    
-    // הפעלה מיידית ומושהית
-    scrollToBottom();
-    setTimeout(scrollToBottom, 200);
-    setTimeout(scrollToBottom, 500);
-    setTimeout(scrollToBottom, 1000);
-    
-    // MutationObserver לגלילה אוטומטית בשינויים
-    try {
-        const targetNode = window.parent.document.body;
-        const config = { childList: true, subtree: true };
-        let scrollTimeout;
         
-        const callback = function(mutationsList) {
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(scrollToBottom, 100);
-        };
+        // הפעלה מיידית ומושהית
+        scrollToBottom();
+        setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 300);
+        setTimeout(scrollToBottom, 500);
+        setTimeout(scrollToBottom, 1000);
         
-        const observer = new MutationObserver(callback);
-        observer.observe(targetNode, config);
-    } catch (e) {
-        console.log('Observer error:', e);
-    }
-</script>
-""", height=0)
+        // אם זה נייד, הוסף listener לגלילה
+        if (window.innerWidth <= 768) {
+            document.addEventListener('DOMContentLoaded', scrollToBottom);
+            window.addEventListener('load', scrollToBottom);
+        }
+    </script>
+    """, height=0)
