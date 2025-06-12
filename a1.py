@@ -9,72 +9,73 @@ h1{font-size:1.5rem;}
 button,select,input{font-size:1rem;}
 section[data-testid="stSidebar"]{display:none;}
 </style>
-""", unsafe_allow_html=True)
+""",unsafe_allow_html=True)
 
 # ───────── נתונים וקבועים ─────────
-DATA_FILE = "schedule.csv"
-TEACHERS  = ['דנה','לילך','רעות','ליאת','לימור']
-DAYS      = ['ראשון','שני','שלישי','רביעי','חמישי','שישי']
-DAY_OFF   = 'יום חופשי'
-PRIORITY  = {'שהייה':1,'פרטני':2}
-COLOR_MAP = {'שהייה':'#c8e6c9','פרטני':'#bbdefb',DAY_OFF:'#e0e0e0'}
+DATA_FILE="schedule.csv"
+TEACHERS=['דנה','לילך','רעות','ליאת','לימור']
+DAYS=['ראשון','שני','שלישי','רביעי','חמישי','שישי']
+DAY_OFF='יום חופשי'
+PRIORITY={'שהייה':1,'פרטני':2}
+COLOR={'שהייה':'#c8e6c9','פרטני':'#bbdefb',DAY_OFF:'#e0e0e0'}
 
 @st.cache_data
 def load_df():
-    df = pd.read_csv(DATA_FILE, dtype=str)
-    df['hour']    = df['hour'].astype(int)
-    df['subject'] = df['subject'].str.strip()
+    df=pd.read_csv(DATA_FILE,dtype=str)
+    df['hour']=df['hour'].astype(int)
+    df['subject']=df['subject'].str.strip()
     return df
-df = load_df()
+df=load_df()
 
 # ───────── פונקציות עזר ─────────
-def find_subs(teacher, day):
-    rows = df[(df.teacher == teacher) & (df.day == day)]
-    if not rows.empty and (rows.subject == DAY_OFF).all():
+def find_subs(tchr,day):
+    rows=df[(df.teacher==tchr)&(df.day==day)]
+    if not rows.empty and (rows.subject==DAY_OFF).all():
         return "DAY_OFF"
-    absent = {r.hour: r.subject for _, r in rows.iterrows()}
-    res={}
+    absent={r.hour:r.subject for _,r in rows.iterrows()}
+    out={}
     for h in range(1,7):
-        subj = absent.get(h,"—")
+        subj=absent.get(h,'—')
         if subj in ('פרטני',DAY_OFF):
-            res[h]=(subj,None); continue
+            out[h]=(subj,None); continue
         opts=[]
         for t in TEACHERS:
-            if t==teacher: continue
-            r = df[(df.teacher==t)&(df.day==day)&(df.hour==h)]
+            if t==tchr: continue
+            r=df[(df.teacher==t)&(df.day==day)&(df.hour==h)]
             if r.empty: continue
-            stat = r.iloc[0].subject
+            stat=r.iloc[0].subject
             if stat in PRIORITY:
                 opts.append((PRIORITY[stat],t,stat))
-        opts.sort(key=lambda x:(x[0], TEACHERS.index(x[1])))
-        res[h]=(subj,opts)
-    return res
+        opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
+        out[h]=(subj,opts)
+    return out
 
-def teacher_matrix(name):
-    sub = df[df.teacher==name]
-    wide = sub.pivot_table(index='hour',columns='day',values='subject',aggfunc='first')
-    return wide.reindex(index=range(1,7), columns=DAYS)
+def matrix(name):
+    wide=df[df.teacher==name].pivot_table(index='hour',columns='day',
+                                          values='subject',aggfunc='first')
+    return wide.reindex(index=range(1,7),columns=DAYS)
 
-def color_cells(val):
-    for k,c in COLOR_MAP.items():
-        if pd.notna(val) and val.startswith(k): return f'background-color:{c}'
+def shade(val):
+    for k,c in COLOR.items():
+        if pd.notna(val) and val.startswith(k):
+            return f'background-color:{c}'
     return ''
 
-# ───────── בחירת תצורה ─────────
-MODE = st.radio("בחר/י תצורה:",["ממשק טפסים","עוזר אישי (צ'אט)"])
+# ───────── מצב ראשי ─────────
+MODE=st.radio("בחר/י תצורה:",["ממשק טפסים","עוזר אישי (צ'אט)"])
 
-# ===================================================
+# =================================================
 # 1) ממשק טפסים + לוח שבועי
-# ===================================================
+# =================================================
 if MODE=="ממשק טפסים":
-    tab_sub, tab_cal = st.tabs(["🧑‍🏫 חלופות","📅 לוח שבועי"])
+    tab_sub,tab_cal=st.tabs(["🧑‍🏫 חלופות","📅 לוח שבועי"])
 
     with tab_sub:
         st.title("🧑‍🏫 בוט חלופות מורים")
-        t_sel = st.selectbox("מורה חסרה",TEACHERS)
-        d_sel = st.selectbox("יום בשבוע",DAYS)
+        t_sel=st.selectbox("מורה חסרה",TEACHERS)
+        d_sel=st.selectbox("יום בשבוע",DAYS)
         if st.button("מצא חלופות",use_container_width=True):
-            res = find_subs(t_sel,d_sel)
+            res=find_subs(t_sel,d_sel)
             if res=="DAY_OFF":
                 st.info(f"✋ {t_sel} בחופש ביום {d_sel} – אין צורך בחלופה.")
             else:
@@ -96,52 +97,48 @@ if MODE=="ממשק טפסים":
             unsafe_allow_html=True)
         for t in TEACHERS:
             with st.expander(f"📋 {t}",expanded=False):
-                styled = teacher_matrix(t).style.map(color_cells)
+                styled=matrix(t).style.map(shade)
                 st.dataframe(styled,use_container_width=True,height=240)
 
-# ===================================================
+# =================================================
 # 2) עוזר אישי (צ'אט)
-# ===================================================
+# =================================================
 else:
     st.title("🤖 עוזר אישי למציאת מחליפות")
 
-    # --- אתחול state ---
+    GREET="שלום גלית! אני העוזר האישי שלך למציאת מחליפות 😊\nאיזו מורה נעדרת היום?"
+    # --- state init ---
     if 'hist' not in st.session_state:
-        st.session_state.hist    = []
-        st.session_state.greeted = False
-        st.session_state.stage   = "teacher"
-        st.session_state.teacher = ""
+        st.session_state.hist=[]
+        st.session_state.stage="teacher"
+        st.session_state.teacher=""
 
-    def bot(msg):  st.session_state.hist.append(("bot",msg))
-    def user(msg): st.session_state.hist.append(("user",msg))
-
-    # --- ברכה יחידה ---
-    GREET = "שלום גלית! אני העוזר האישי שלך למציאת מחליפות 😊\nאיזו מורה נעדרת היום?"
-    if not st.session_state.greeted:
+    # הוספת ברכה רק אם אינה קיימת
+    if not any(role=="bot" and msg.startswith("שלום גלית") for role,msg in st.session_state.hist):
         st.session_state.hist.append(("bot",GREET))
-        st.session_state.greeted = True
 
-    # --- chat render ---
-    chat = st.container()
-    def redraw():
-        chat.empty()
+    def bot(m):  st.session_state.hist.append(("bot",m))
+    def user(m): st.session_state.hist.append(("user",m))
+
+    def render():
+        st.container().empty()
         for role,msg in st.session_state.hist:
-            with chat.chat_message("assistant" if role=="bot" else "user"):
+            with st.chat_message("assistant" if role=="bot" else "user"):
                 st.markdown(msg)
-    redraw()
+    render()
 
-    # --- callbacks ---
-    def choose_teacher():
-        t=st.session_state.sel_teacher
+    # callbacks
+    def pick_teacher():
+        t=st.session_state.box_teacher
         if t:
             user(t)
             st.session_state.teacher=t
             st.session_state.stage="day"
             bot(f"מצוין, בחרנו במורה **{t}**.\nעכשיו בחרי יום היעדרות:")
-            redraw()
+            render()
 
-    def choose_day():
-        d=st.session_state.sel_day
+    def pick_day():
+        d=st.session_state.box_day
         if d:
             user(d)
             res=find_subs(st.session_state.teacher,d)
@@ -162,20 +159,13 @@ else:
             bot("אם תרצי שוב – בחרי מורה חדשה 😊")
             # reset
             st.session_state.stage="teacher"
-            st.session_state.sel_teacher=""
-            st.session_state.sel_day=""
-            redraw()
+            st.session_state.box_teacher=""
+            st.session_state.box_day=""
+            render()
 
-    # --- UI דינמי ---
     if st.session_state.stage=="teacher":
-        st.selectbox("בחרי מורה חסרה:",
-                     [""]+TEACHERS,
-                     key="sel_teacher",
-                     on_change=choose_teacher)
+        st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="box_teacher",on_change=pick_teacher)
     elif st.session_state.stage=="day":
-        st.selectbox("בחרי יום:",
-                     [""]+DAYS,
-                     key="sel_day",
-                     on_change=choose_day)
+        st.selectbox("בחרי יום:",[""]+DAYS,key="box_day",on_change=pick_day)
 
-    redraw()
+    render()
