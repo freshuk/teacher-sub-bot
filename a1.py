@@ -2,255 +2,34 @@ import streamlit as st
 import pandas as pd
 import time
 from pathlib import Path
+import streamlit.components.v1 as components
 
-# ───────── הגדרות עמוד ─────────
-st.set_page_config(
-    page_title="צמרובוט – העוזר האישי שלי",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
-# ───────── CSS מקצועי ─────────
+# ───────── הגדרות עמוד + CSS ─────────
+st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
+h1{font-size:1.8rem;font-weight:800;margin-bottom:0.4rem;display:inline;}
+.chat-msg{background:#f2f4f8;border-radius:14px;padding:0.7rem 1rem;margin:0.3rem 0;}
+.chat-user{background:#d9e8ff;}
+button,select,input,label{font-size:1rem;}
+section[data-testid="stSidebar"]{display:none;}
+</style>""", unsafe_allow_html=True)
 
-html, body, [class*="css"] {
-    font-family: 'Heebo', sans-serif !important;
-    direction: rtl;
-    text-align: right;
-}
-
-.main .block-container {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-    max-width: 42rem;
-}
-
-section[data-testid="stSidebar"] { display: none; }
-.stDeployButton { display: none; }
-footer { display: none; }
-header { display: none; }
-div[data-testid="stToolbar"] { display: none; }
-
-/* הסתרת אלמנטים מיותרים */
-.element-container:has(> .stSelectbox):empty { display: none !important; }
-.element-container:has(> .stRadio):empty { display: none !important; }
-.stMarkdown:empty { display: none !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# CSS נוסף - עיצוב ראשי
-st.markdown("""
-<style>
-.app-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 1.5rem;
-    border-radius: 20px;
-    margin-bottom: 2rem;
-    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
-    color: white;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-}
-
-.header-icon {
-    width: 50px;
-    height: 50px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-}
-
-.header-text h1 {
-    font-size: 1.8rem;
-    font-weight: 700;
-    margin: 0;
-    color: white;
-}
-
-.header-text p {
-    font-size: 1rem;
-    opacity: 0.9;
-    margin: 0.5rem 0 0 0;
-    color: white;
-}
-
-.chat-container {
-    background: #ffffff;
-    border-radius: 20px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-    border: 1px solid rgba(102, 126, 234, 0.1);
-    min-height: 300px;
-    max-height: 500px;
-    overflow-y: auto;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# CSS הודעות צ'אט
-st.markdown("""
-<style>
-.chat-msg {
-    margin: 1rem 0;
-    clear: both;
-    opacity: 0;
-    animation: fadeInUp 0.6s ease-out forwards;
-}
-
-.chat-bot {
-    background: linear-gradient(135deg, #f8faff 0%, #ecf2ff 100%);
-    border: 1px solid #e1e8f7;
-    border-radius: 18px 18px 18px 4px;
-    padding: 1rem 1.2rem;
-    margin-left: 2rem;
-    position: relative;
-    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.1);
-}
-
-.chat-bot::before {
-    content: "🤖";
-    position: absolute;
-    right: -0.5rem;
-    top: -0.5rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-}
-
-.chat-user {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 18px 18px 4px 18px;
-    padding: 0.8rem 1.2rem;
-    margin-right: 2rem;
-    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.2);
-    text-align: right;
-    font-weight: 500;
-}
-
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-</style>
-""", unsafe_allow_html=True)
-
-# CSS אנימציות וכפתורים
-st.markdown("""
-<style>
-.thinking-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #667eea;
-    font-weight: 500;
-    margin: 1rem 0;
-    padding: 1rem;
-    background: rgba(102, 126, 234, 0.05);
-    border-radius: 12px;
-    border-right: 4px solid #667eea;
-    opacity: 0;
-    animation: fadeInUp 0.3s ease-out forwards;
-}
-
-.typing-dots {
-    display: flex;
-    gap: 4px;
-}
-
-.typing-dots span {
-    width: 6px;
-    height: 6px;
-    background: #667eea;
-    border-radius: 50%;
-    animation: typing 1.4s infinite;
-}
-
-.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typing {
-    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-    30% { transform: translateY(-10px); opacity: 1; }
-}
-
-.control-panel {
-    background: linear-gradient(135deg, #f8faff 0%, #ffffff 100%);
-    border-radius: 20px;
-    padding: 1.5rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-    border: 1px solid rgba(102, 126, 234, 0.1);
-    margin-bottom: 1rem;
-}
-
-.control-title {
-    color: #667eea;
-    font-weight: 600;
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.stSelectbox > div > div {
-    background: white;
-    border: 2px solid #e1e8f7;
-    border-radius: 12px;
-    transition: all 0.3s ease;
-}
-
-.stButton > button {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 0.8rem 1.5rem;
-    font-weight: 600;
-    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.2);
-    width: 100%;
-    transition: all 0.3s ease;
-}
-
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
-}
-
-@media (max-width: 768px) {
-    .main .block-container { padding: 1rem; }
-    .app-header { padding: 1rem; margin-bottom: 1rem; flex-direction: column; gap: 0.5rem; }
-    .header-text h1 { font-size: 1.5rem; }
-    .chat-container { padding: 1rem; max-height: 400px; }
-    .chat-bot { margin-left: 1rem; }
-    .chat-user { margin-right: 1rem; }
-    .control-panel { padding: 1rem; }
-}
-</style>
-""", unsafe_allow_html=True)
+# ───────── אייקון בוט ─────────
+ICON = Path("bot_calendar.png")          # הוסף לקובץ הפרויקט
+if ICON.exists():
+    ic, ttl = st.columns([1,9])
+    with ic:  st.image(str(ICON), width=64)
+    with ttl: st.markdown("### צמרובוט – העוזר האישי שלי")
+else:
+    st.title("🤖 צמרובוט – העוזר האישי שלי")
 
 # ───────── נתונים וקבועים ─────────
-DATA_FILE = "schedule.csv"
-TEACHERS = ['דנה', 'לילך', 'רעות', 'ליאת', 'לימור']
-DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי']
-DAY_OFF = 'יום חופשי'
-PRIORITY = {'שהייה': 1, 'פרטני': 2}
+DATA_FILE="schedule.csv"
+TEACHERS=['דנה','לילך','רעות','ליאת','לימור']
+DAYS=['ראשון','שני','שלישי','רביעי','חמישי','שישי']
+DAY_OFF='יום חופשי'
+PRIORITY={'שהייה':1,'פרטני':2}
 
 @st.cache_data
 def load_df():
@@ -258,285 +37,130 @@ def load_df():
     df['hour'] = df['hour'].astype(int)
     df['subject'] = df['subject'].str.strip()
     return df
-
 df = load_df()
 
-def get_subs(teacher, day, start_hr):
+def get_subs(teacher, day, start):
     rows = df[(df.teacher == teacher) & (df.day == day)]
     if not rows.empty and (rows.subject == DAY_OFF).all():
         return "DAY_OFF"
     absent = {r.hour: r.subject for _, r in rows.iterrows()}
-    res = {}
-    for h in range(start_hr, 7):
-        subj = absent.get(h, '—')
+    out = {}
+    for h in range(start, 7):
+        subj = absent.get(h, "—")
         if subj in ('פרטני', DAY_OFF):
-            res[h] = (subj, None)
-            continue
-        opts = []
+            out[h] = (subj, None); continue
+        opts=[]
         for t in TEACHERS:
-            if t == teacher:
-                continue
-            r = df[(df.teacher == t) & (df.day == day) & (df.hour == h)]
-            if r.empty:
-                continue
-            stat = r.iloc[0].subject
+            if t==teacher: continue
+            r=df[(df.teacher==t)&(df.day==day)&(df.hour==h)]
+            if r.empty: continue
+            stat=r.iloc[0].subject
             if stat in PRIORITY:
-                opts.append((PRIORITY[stat], t, stat))
-        opts.sort(key=lambda x: (x[0], TEACHERS.index(x[1])))
-        res[h] = (subj, opts)
-    return res
+                opts.append((PRIORITY[stat],t,stat))
+        opts.sort(key=lambda x:(x[0], TEACHERS.index(x[1])))
+        out[h]=(subj,opts)
+    return out
 
-# ───────── Header עם אייקון ─────────
-ICON = Path("bot_calendar.png")
-
-if ICON.exists():
-    st.markdown(f"""
-    <div class="app-header">
-        <img src="data:image/png;base64,{Path(ICON).read_bytes().hex()}" style="width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.2); padding: 8px;">
-        <div class="header-text">
-            <h1>צמרובוט</h1>
-            <p>העוזר האישי שלך למציאת מורה מחליפה</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.markdown("""
-    <div class="app-header">
-        <div class="header-icon">🤖</div>
-        <div class="header-text">
-            <h1>צמרובוט</h1>
-            <p>העוזר האישי שלך למציאת מורה מחליפה</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ───────── אתחול צ'אט ─────────
-GREET = "שלום גלית! 👋 אני צמרובוט, העוזר האישי שלך.<br><br>אני כאן לעזור לך למצוא מורה מחליפה במהירות ובקלות. בואי נתחיל!"
-
+# ───────── state init ─────────
+GREET="שלום גלית! אני צמרובוט, העוזר האישי שלך 😊\nבמה אני יכול לעזור לך היום?"
 if 'chat' not in st.session_state:
-    st.session_state.chat = [("bot", GREET)]
-    st.session_state.stage = "teacher"
-    st.session_state.teacher = st.session_state.day = ""
-    st.session_state.start = 1
-    st.session_state.sel_teacher = st.session_state.sel_day = st.session_state.sel_scope = st.session_state.sel_hr = ""
+    st.session_state.chat=[("bot", GREET)]
+    st.session_state.stage="teacher"
+    st.session_state.teacher=st.session_state.day=""
+    st.session_state.start=1
+    st.session_state.sel_teacher=st.session_state.sel_day=st.session_state.sel_scope=st.session_state.sel_hr=""
 
-def bot(m):
-    st.session_state.chat.append(("bot", m))
+# ───────── מניעת כפילויות ─────────
+def add_msg(role:str, msg:str):
+    if not st.session_state.chat or st.session_state.chat[-1]!=(role, msg):
+        st.session_state.chat.append((role, msg))
 
-def usr(m):
-    st.session_state.chat.append(("user", m))
-
-def scroll_to_bottom():
-    """גלילה אוטומטית למטה"""
-    st.markdown("""
-    <script>
-    setTimeout(function() {
-        var chatContainer = document.querySelector('.chat-container');
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-    }, 100);
-    </script>
-    """, unsafe_allow_html=True)
-
-def show_thinking():
-    """הצגת אנימציית חשיבה"""
-    thinking_placeholder = st.empty()
-    with thinking_placeholder.container():
-        st.markdown("""
-        <div class="thinking-indicator">
-            <span>🤖 צמרובוט חושב</span>
-            <div class="typing-dots">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    time.sleep(2)
-    thinking_placeholder.empty()
-
+# ───────── ציור צ׳אט + גלילה ─────────
 def redraw():
-    """עדכון תצוגת הצ'אט"""
-    with st.container():
-        for i, (role, msg) in enumerate(st.session_state.chat):
-            if role == "user":
-                st.markdown(f"""
-                <div class="chat-msg" style="animation-delay: {i*0.1}s;">
-                    <div class="chat-user">{msg}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="chat-msg" style="animation-delay: {i*0.1}s;">
-                    <div class="chat-bot">{msg}</div>
-                </div>
-                """, unsafe_allow_html=True)
-    scroll_to_bottom()
+    chat_box.empty()
+    for role,txt in st.session_state.chat:
+        cls = "chat-msg chat-user" if role=="user" else "chat-msg"
+        with chat_box:
+            st.markdown(f"<div class='{cls}'>{txt}</div>", unsafe_allow_html=True)
+    # גלילה אוטומטית
+    components.html("<script>window.scrollTo(0, document.body.scrollHeight);</script>", height=0)
 
-# ───────── תצוגת צ'אט ─────────
-with st.container():
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    redraw()
-    st.markdown('</div>', unsafe_allow_html=True)
+chat_box = st.container()
+redraw()
 
-# ───────── Callbacks ─────────
+# ───────── callbacks ─────────
 def cb_teacher():
     t = st.session_state.sel_teacher
     if t:
-        usr(f"מורה: {t}")
-        st.session_state.teacher = t
-        st.session_state.stage = "day"
-        
-        # הוספת אנימציית חשיבה
-        with st.container():
-            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-            redraw()
-            show_thinking()
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        bot(f"מעולה! בחרנו במורה <strong>{t}</strong> ✨<br><br>לאיזה יום היא נעדרת?")
-        st.rerun()
+        add_msg("user", t)
+        st.session_state.teacher=t
+        st.session_state.stage="day"
+        add_msg("bot", f"מעולה, בחרנו במורה **{t}**.\nלאיזה יום היא נעדרת?")
+        redraw()
 
 def cb_day():
     d = st.session_state.sel_day
     if d:
-        usr(f"יום: {d}")
-        st.session_state.day = d
-        st.session_state.stage = "scope"
-        
-        # הוספת אנימציית חשיבה
-        with st.container():
-            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-            redraw()
-            show_thinking()
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        bot("האם היא נעדרת <strong>יום שלם</strong> או רק <strong>מ-שעה מסוימת</strong>? 🕐")
-        st.rerun()
+        add_msg("user", d)
+        st.session_state.day=d
+        st.session_state.stage="scope"
+        add_msg("bot", "היא נעדרת **יום שלם** או **מ-שעה**?")
+        redraw()
 
 def cb_scope():
-    s = st.session_state.sel_scope
-    if s == "יום שלם":
-        usr("יום שלם")
-        st.session_state.start = 1
-        run()
-    elif s == "מ-שעה":
-        usr("מ-שעה")
-        
-        # הוספת אנימציית חשיבה
-        with st.container():
-            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-            redraw()
-            show_thinking()
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        bot("באיזו שעה מתחילה ההיעדרות? (שעות 1-6) 📚")
-        st.rerun()
+    sc = st.session_state.sel_scope
+    if sc=="יום שלם":
+        st.session_state.start=1; run_calc()
+    elif sc=="מ-שעה":
+        add_msg("bot", "בחרי שעת התחלה (1-6):"); redraw()
 
 def cb_hr():
     hr = st.session_state.sel_hr
     if hr:
-        usr(f"משעה {hr}")
-        st.session_state.start = int(hr)
-        run()
+        add_msg("user", f"מהשעה {hr}")
+        st.session_state.start=int(hr)
+        run_calc()
 
-def run():
-    """ביצוע החיפוש והצגת התוצאות"""
-    # הוספת אנימציית חשיבה
-    with st.container():
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-        redraw()
-        show_thinking()
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    res = get_subs(st.session_state.teacher, st.session_state.day, st.session_state.start)
-    
-    if res == "DAY_OFF":
-        bot(f"""
-        ✋ מצוין! 
-        <strong>{st.session_state.teacher}</strong> נמצאת בחופש ביום <strong>{st.session_state.day}</strong><br>
-        <strong>אין צורך בחלופה</strong> 🎉
-        """)
+def run_calc():
+    with st.spinner("צמרובוט חושב…"): time.sleep(1.2)
+    res=get_subs(st.session_state.teacher, st.session_state.day, st.session_state.start)
+    if res=="DAY_OFF":
+        add_msg("bot", f"✋ {st.session_state.teacher} בחופש ביום **{st.session_state.day}** – אין צורך בחלופה.")
     else:
-        ans = f"""
-        📋 הנה החלופות למורה <strong>{st.session_state.teacher}</strong> ביום <strong>{st.session_state.day}</strong>:<br><br>
-        """
-        
-        for h in range(st.session_state.start, 7):
-            subj, subs = res[h]
-            ans += f"<strong>🕐 שעה {h}</strong> – {subj}<br>"
-            
+        ans=f"להלן החלופות למורה **{st.session_state.teacher}** ביום **{st.session_state.day}**:\n"
+        for h in range(st.session_state.start,7):
+            subj,subs=res[h]
+            ans+=f"\n**🕐 שעה {h}** – {subj}\n"
             if subs is None:
-                ans += "▪️ אין צורך בחלופה<br>"
+                ans+="▪️ אין צורך בחלופה\n"
             elif subs:
-                ans += "▪️ <strong>חלופה זמינה:</strong> " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "<br>"
+                ans+="▪️ חלופה: "+" / ".join(f\"{t} ({s})\" for _,t,s in subs)+"\n"
             else:
-                ans += "▪️ <em>אין חלופה זמינה</em><br>"
-            ans += "<br>"
-        
-        bot(ans)
-    
-    # סיום מחזור
-    time.sleep(1)
-    bot("שמחתי לעזור! 😊<br>אם יש לך עוד שאלות, אני כאן בשבילך 🌸")
-    reset()
-    st.rerun()
+                ans+="▪️ אין חלופה זמינה\n"
+        add_msg("bot", ans)
+    add_msg("bot", "שמחתי לעזור! תמיד כאן לשירותך, צמרובוט 🌸")
+    reset(); redraw()
 
 def reset():
-    """איפוס למחזור חדש"""
-    st.session_state.stage = "teacher"
-    st.session_state.sel_teacher = st.session_state.sel_day = st.session_state.sel_scope = st.session_state.sel_hr = ""
+    st.session_state.stage="teacher"
+    st.session_state.sel_teacher=st.session_state.sel_day=st.session_state.sel_scope=st.session_state.sel_hr=""
 
-# ───────── פאנל בקרה ─────────
-with st.container():
-    st.markdown('<div class="control-panel">', unsafe_allow_html=True)
-
-    if st.session_state.stage == "teacher":
-        st.markdown('<div class="control-title">👩‍🏫 בחירת מורה</div>', unsafe_allow_html=True)
-        st.selectbox(
-            "איזו מורה נעדרת?",
-            [""] + TEACHERS,
-            key="sel_teacher",
-            on_change=cb_teacher,
-            help="בחרי את המורה שאת מחפשת עבורה חלופה"
-        )
-
-    elif st.session_state.stage == "day":
-        st.markdown('<div class="control-title">📅 בחירת יום</div>', unsafe_allow_html=True)
-        st.selectbox(
-            "באיזה יום היא נעדרת?",
-            [""] + DAYS,
-            key="sel_day",
-            on_change=cb_day,
-            help="בחרי את יום ההיעדרות"
-        )
-
-    elif st.session_state.stage == "scope":
-        st.markdown('<div class="control-title">⏰ סוג היעדרות</div>', unsafe_allow_html=True)
-        st.radio(
-            "היקף ההיעדרות:",
-            ("", "יום שלם", "מ-שעה"),
-            key="sel_scope",
-            on_change=cb_scope,
-            horizontal=True,
-            help="האם ההיעדרות היא ליום שלם או מתחילה משעה מסוימת?"
-        )
-        
-        if st.session_state.sel_scope == "מ-שעה":
-            st.selectbox(
-                "מאיזו שעה?",
-                [""] + [str(i) for i in range(1, 7)],
-                key="sel_hr",
-                on_change=cb_hr,
-                help="בחרי את השעה שבה מתחילה ההיעדרות"
-            )
-
-    st.markdown('</div>', unsafe_allow_html=True)
+# ───────── UI דינמי ─────────
+if st.session_state.stage=="teacher":
+    st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,
+                 key="sel_teacher", on_change=cb_teacher)
+elif st.session_state.stage=="day":
+    st.selectbox("בחרי יום:",[""]+DAYS,
+                 key="sel_day", on_change=cb_day)
+elif st.session_state.stage=="scope":
+    st.radio("היעדרות:", ("", "יום שלם","מ-שעה"),
+             key="sel_scope", on_change=cb_scope)
+    if st.session_state.sel_scope=="מ-שעה":
+        st.selectbox("שעת התחלה (1-6):",[""]+[str(i) for i in range(1,7)],
+                     key="sel_hr", on_change=cb_hr)
 
 # ───────── כפתור ניקוי ─────────
-st.markdown("<br>", unsafe_allow_html=True)
-if st.button("🗑️ התחל מחדש", help="נקה את המסך והתחל שיחה חדשה"):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.rerun()
+st.divider()
+if st.button("🗑️ נקה מסך"):
+    st.session_state.clear()
+    st.rerun()   # עובד – הקריאה *מחוץ* לקולבק
