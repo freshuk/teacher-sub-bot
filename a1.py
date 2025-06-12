@@ -122,7 +122,7 @@ def calculate():
         for h in range(st.session_state.start,7):
             subj,subs=res[h]; txt+=f"\n**🕐 שעה {h}** – {subj}\n"
             if subs is None: txt+="▪️ אין צורך בחלופה\n"
-            elif subs: txt+="▪️ חלופה: "+" / ".join(f\"{t} ({s})\" for _,t,s in subs)+"\n"
+            elif subs: txt+= "▪️ חלופה: " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "\n"
             else: txt+="▪️ אין חלופה זמינה\n"
         add("bot",txt)
     add("bot","שמחתי לעזור! תמיד כאן לשירותך, צמרובוט 🌸")
