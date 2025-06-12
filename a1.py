@@ -22,7 +22,8 @@ html, body, [class*="css"] {
 }
 
 .main .block-container {
-    padding-top: 2rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
     max-width: 42rem;
 }
 
@@ -30,10 +31,16 @@ section[data-testid="stSidebar"] { display: none; }
 .stDeployButton { display: none; }
 footer { display: none; }
 header { display: none; }
+div[data-testid="stToolbar"] { display: none; }
+
+/* הסתרת אלמנטים מיותרים */
+.element-container:has(> .stSelectbox):empty { display: none !important; }
+.element-container:has(> .stRadio):empty { display: none !important; }
+.stMarkdown:empty { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# CSS נוסף - חלק 2
+# CSS נוסף - עיצוב ראשי
 st.markdown("""
 <style>
 .app-header {
@@ -44,18 +51,35 @@ st.markdown("""
     box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
     color: white;
     text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
 }
 
-.app-title {
+.header-icon {
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.header-text h1 {
     font-size: 1.8rem;
     font-weight: 700;
     margin: 0;
+    color: white;
 }
 
-.app-subtitle {
+.header-text p {
     font-size: 1rem;
     opacity: 0.9;
-    margin-top: 0.5rem;
+    margin: 0.5rem 0 0 0;
+    color: white;
 }
 
 .chat-container {
@@ -72,13 +96,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# CSS חלק 3 - הודעות צ'אט
+# CSS הודעות צ'אט
 st.markdown("""
 <style>
 .chat-msg {
     margin: 1rem 0;
-    animation: fadeInUp 0.5s ease-out;
     clear: both;
+    opacity: 0;
+    animation: fadeInUp 0.6s ease-out forwards;
 }
 
 .chat-bot {
@@ -112,15 +137,21 @@ st.markdown("""
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border-radius: 18px 18px 4px 18px;
-    padding: 1rem 1.2rem;
+    padding: 0.8rem 1.2rem;
     margin-right: 2rem;
     box-shadow: 0 2px 12px rgba(102, 126, 234, 0.2);
     text-align: right;
+    font-weight: 500;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# CSS חלק 4 - אנימציות ואלמנטים
+# CSS אנימציות וכפתורים
 st.markdown("""
 <style>
 .thinking-indicator {
@@ -134,6 +165,8 @@ st.markdown("""
     background: rgba(102, 126, 234, 0.05);
     border-radius: 12px;
     border-right: 4px solid #667eea;
+    opacity: 0;
+    animation: fadeInUp 0.3s ease-out forwards;
 }
 
 .typing-dots {
@@ -157,30 +190,6 @@ st.markdown("""
     30% { transform: translateY(-10px); opacity: 1; }
 }
 
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.loading-spinner {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(102, 126, 234, 0.3);
-    border-radius: 50%;
-    border-top-color: #667eea;
-    animation: spin 1s ease-in-out infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-</style>
-""", unsafe_allow_html=True)
-
-# CSS חלק 5 - פאנל בקרה וכפתורים
-st.markdown("""
-<style>
 .control-panel {
     background: linear-gradient(135deg, #f8faff 0%, #ffffff 100%);
     border-radius: 20px;
@@ -216,12 +225,18 @@ st.markdown("""
     font-weight: 600;
     box-shadow: 0 4px 15px rgba(255, 107, 107, 0.2);
     width: 100%;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
 }
 
 @media (max-width: 768px) {
     .main .block-container { padding: 1rem; }
-    .app-header { padding: 1rem; margin-bottom: 1rem; }
-    .app-title { font-size: 1.5rem; }
+    .app-header { padding: 1rem; margin-bottom: 1rem; flex-direction: column; gap: 0.5rem; }
+    .header-text h1 { font-size: 1.5rem; }
     .chat-container { padding: 1rem; max-height: 400px; }
     .chat-bot { margin-left: 1rem; }
     .chat-user { margin-right: 1rem; }
@@ -271,13 +286,29 @@ def get_subs(teacher, day, start_hr):
         res[h] = (subj, opts)
     return res
 
-# ───────── Header ─────────
-st.markdown("""
-<div class="app-header">
-    <div class="app-title">🤖 צמרובוט</div>
-    <div class="app-subtitle">העוזר האישי שלך למציאת מורה מחליפה</div>
-</div>
-""", unsafe_allow_html=True)
+# ───────── Header עם אייקון ─────────
+ICON = Path("bot_calendar.png")
+
+if ICON.exists():
+    st.markdown(f"""
+    <div class="app-header">
+        <img src="data:image/png;base64,{Path(ICON).read_bytes().hex()}" style="width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.2); padding: 8px;">
+        <div class="header-text">
+            <h1>צמרובוט</h1>
+            <p>העוזר האישי שלך למציאת מורה מחליפה</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <div class="app-header">
+        <div class="header-icon">🤖</div>
+        <div class="header-text">
+            <h1>צמרובוט</h1>
+            <p>העוזר האישי שלך למציאת מורה מחליפה</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ───────── אתחול צ'אט ─────────
 GREET = "שלום גלית! 👋 אני צמרובוט, העוזר האישי שלך.<br><br>אני כאן לעזור לך למצוא מורה מחליפה במהירות ובקלות. בואי נתחיל!"
@@ -295,46 +326,59 @@ def bot(m):
 def usr(m):
     st.session_state.chat.append(("user", m))
 
+def scroll_to_bottom():
+    """גלילה אוטומטית למטה"""
+    st.markdown("""
+    <script>
+    setTimeout(function() {
+        var chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }, 100);
+    </script>
+    """, unsafe_allow_html=True)
+
 def show_thinking():
     """הצגת אנימציית חשיבה"""
     thinking_placeholder = st.empty()
-    thinking_placeholder.markdown("""
-    <div class="thinking-indicator">
-        <div class="loading-spinner"></div>
-        <span>צמרובוט חושב</span>
-        <div class="typing-dots">
-            <span></span>
-            <span></span>
-            <span></span>
+    with thinking_placeholder.container():
+        st.markdown("""
+        <div class="thinking-indicator">
+            <span>🤖 צמרובוט חושב</span>
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
-    time.sleep(1.5)
+        """, unsafe_allow_html=True)
+    time.sleep(2)
     thinking_placeholder.empty()
 
 def redraw():
     """עדכון תצוגת הצ'אט"""
-    chat_container.empty()
-    with chat_container.container():
-        for role, msg in st.session_state.chat:
+    with st.container():
+        for i, (role, msg) in enumerate(st.session_state.chat):
             if role == "user":
                 st.markdown(f"""
-                <div class="chat-msg">
+                <div class="chat-msg" style="animation-delay: {i*0.1}s;">
                     <div class="chat-user">{msg}</div>
                 </div>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown(f"""
-                <div class="chat-msg">
+                <div class="chat-msg" style="animation-delay: {i*0.1}s;">
                     <div class="chat-bot">{msg}</div>
                 </div>
                 """, unsafe_allow_html=True)
+    scroll_to_bottom()
 
 # ───────── תצוגת צ'אט ─────────
-st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-chat_container = st.container()
-redraw()
-st.markdown('</div>', unsafe_allow_html=True)
+with st.container():
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    redraw()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ───────── Callbacks ─────────
 def cb_teacher():
@@ -343,9 +387,16 @@ def cb_teacher():
         usr(f"מורה: {t}")
         st.session_state.teacher = t
         st.session_state.stage = "day"
-        show_thinking()
+        
+        # הוספת אנימציית חשיבה
+        with st.container():
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            redraw()
+            show_thinking()
+            st.markdown('</div>', unsafe_allow_html=True)
+        
         bot(f"מעולה! בחרנו במורה <strong>{t}</strong> ✨<br><br>לאיזה יום היא נעדרת?")
-        redraw()
+        st.rerun()
 
 def cb_day():
     d = st.session_state.sel_day
@@ -353,9 +404,16 @@ def cb_day():
         usr(f"יום: {d}")
         st.session_state.day = d
         st.session_state.stage = "scope"
-        show_thinking()
+        
+        # הוספת אנימציית חשיבה
+        with st.container():
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            redraw()
+            show_thinking()
+            st.markdown('</div>', unsafe_allow_html=True)
+        
         bot("האם היא נעדרת <strong>יום שלם</strong> או רק <strong>מ-שעה מסוימת</strong>? 🕐")
-        redraw()
+        st.rerun()
 
 def cb_scope():
     s = st.session_state.sel_scope
@@ -365,9 +423,16 @@ def cb_scope():
         run()
     elif s == "מ-שעה":
         usr("מ-שעה")
-        show_thinking()
+        
+        # הוספת אנימציית חשיבה
+        with st.container():
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            redraw()
+            show_thinking()
+            st.markdown('</div>', unsafe_allow_html=True)
+        
         bot("באיזו שעה מתחילה ההיעדרות? (שעות 1-6) 📚")
-        redraw()
+        st.rerun()
 
 def cb_hr():
     hr = st.session_state.sel_hr
@@ -378,7 +443,13 @@ def cb_hr():
 
 def run():
     """ביצוע החיפוש והצגת התוצאות"""
-    show_thinking()
+    # הוספת אנימציית חשיבה
+    with st.container():
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        redraw()
+        show_thinking()
+        st.markdown('</div>', unsafe_allow_html=True)
+    
     res = get_subs(st.session_state.teacher, st.session_state.day, st.session_state.start)
     
     if res == "DAY_OFF":
@@ -410,7 +481,7 @@ def run():
     time.sleep(1)
     bot("שמחתי לעזור! 😊<br>אם יש לך עוד שאלות, אני כאן בשבילך 🌸")
     reset()
-    redraw()
+    st.rerun()
 
 def reset():
     """איפוס למחזור חדש"""
@@ -418,49 +489,50 @@ def reset():
     st.session_state.sel_teacher = st.session_state.sel_day = st.session_state.sel_scope = st.session_state.sel_hr = ""
 
 # ───────── פאנל בקרה ─────────
-st.markdown('<div class="control-panel">', unsafe_allow_html=True)
+with st.container():
+    st.markdown('<div class="control-panel">', unsafe_allow_html=True)
 
-if st.session_state.stage == "teacher":
-    st.markdown('<div class="control-title">👩‍🏫 בחירת מורה</div>', unsafe_allow_html=True)
-    st.selectbox(
-        "איזו מורה נעדרת?",
-        [""] + TEACHERS,
-        key="sel_teacher",
-        on_change=cb_teacher,
-        help="בחרי את המורה שאת מחפשת עבורה חלופה"
-    )
-
-elif st.session_state.stage == "day":
-    st.markdown('<div class="control-title">📅 בחירת יום</div>', unsafe_allow_html=True)
-    st.selectbox(
-        "באיזה יום היא נעדרת?",
-        [""] + DAYS,
-        key="sel_day",
-        on_change=cb_day,
-        help="בחרי את יום ההיעדרות"
-    )
-
-elif st.session_state.stage == "scope":
-    st.markdown('<div class="control-title">⏰ סוג היעדרות</div>', unsafe_allow_html=True)
-    st.radio(
-        "היקף ההיעדרות:",
-        ("", "יום שלם", "מ-שעה"),
-        key="sel_scope",
-        on_change=cb_scope,
-        horizontal=True,
-        help="האם ההיעדרות היא ליום שלם או מתחילה משעה מסוימת?"
-    )
-    
-    if st.session_state.sel_scope == "מ-שעה":
+    if st.session_state.stage == "teacher":
+        st.markdown('<div class="control-title">👩‍🏫 בחירת מורה</div>', unsafe_allow_html=True)
         st.selectbox(
-            "מאיזו שעה?",
-            [""] + [str(i) for i in range(1, 7)],
-            key="sel_hr",
-            on_change=cb_hr,
-            help="בחרי את השעה שבה מתחילה ההיעדרות"
+            "איזו מורה נעדרת?",
+            [""] + TEACHERS,
+            key="sel_teacher",
+            on_change=cb_teacher,
+            help="בחרי את המורה שאת מחפשת עבורה חלופה"
         )
 
-st.markdown('</div>', unsafe_allow_html=True)
+    elif st.session_state.stage == "day":
+        st.markdown('<div class="control-title">📅 בחירת יום</div>', unsafe_allow_html=True)
+        st.selectbox(
+            "באיזה יום היא נעדרת?",
+            [""] + DAYS,
+            key="sel_day",
+            on_change=cb_day,
+            help="בחרי את יום ההיעדרות"
+        )
+
+    elif st.session_state.stage == "scope":
+        st.markdown('<div class="control-title">⏰ סוג היעדרות</div>', unsafe_allow_html=True)
+        st.radio(
+            "היקף ההיעדרות:",
+            ("", "יום שלם", "מ-שעה"),
+            key="sel_scope",
+            on_change=cb_scope,
+            horizontal=True,
+            help="האם ההיעדרות היא ליום שלם או מתחילה משעה מסוימת?"
+        )
+        
+        if st.session_state.sel_scope == "מ-שעה":
+            st.selectbox(
+                "מאיזו שעה?",
+                [""] + [str(i) for i in range(1, 7)],
+                key="sel_hr",
+                on_change=cb_hr,
+                help="בחרי את השעה שבה מתחילה ההיעדרות"
+            )
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ───────── כפתור ניקוי ─────────
 st.markdown("<br>", unsafe_allow_html=True)
