@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# ───────────────── הגדרות עמוד + CSS ─────────────────
+# ───────── הגדרות עמוד ─────────
 st.set_page_config(page_title="בוט חלופות", layout="centered")
 st.markdown("""
 <style>
@@ -11,7 +11,7 @@ section[data-testid="stSidebar"]{display:none;}
 </style>
 """, unsafe_allow_html=True)
 
-# ───────────────── נתונים וקבועים ────────────────────
+# ───────── נתונים וקבועים ─────────
 DATA_FILE = "schedule.csv"
 TEACHERS  = ['דנה','לילך','רעות','ליאת','לימור']
 DAYS      = ['ראשון','שני','שלישי','רביעי','חמישי','שישי']
@@ -27,12 +27,12 @@ def load_df():
     return df
 df = load_df()
 
-# ───────────────── פונקציות עזר ─────────────────────
+# ───────── פונקציות עזר ─────────
 def find_subs(teacher, day):
     rows = df[(df.teacher == teacher) & (df.day == day)]
     if not rows.empty and (rows.subject == DAY_OFF).all():
         return "DAY_OFF"
-    absent = {r.hour:r.subject for _, r in rows.iterrows()}
+    absent = {r.hour: r.subject for _, r in rows.iterrows()}
     res={}
     for h in range(1,7):
         subj = absent.get(h,"—")
@@ -46,7 +46,7 @@ def find_subs(teacher, day):
             stat = r.iloc[0].subject
             if stat in PRIORITY:
                 opts.append((PRIORITY[stat],t,stat))
-        opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
+        opts.sort(key=lambda x:(x[0], TEACHERS.index(x[1])))
         res[h]=(subj,opts)
     return res
 
@@ -57,11 +57,10 @@ def teacher_matrix(name):
 
 def color_cells(val):
     for k,c in COLOR_MAP.items():
-        if pd.notna(val) and val.startswith(k):
-            return f'background-color:{c}'
+        if pd.notna(val) and val.startswith(k): return f'background-color:{c}'
     return ''
 
-# ───────────────── בחירת תצורה ──────────────────────
+# ───────── בחירת תצורה ─────────
 MODE = st.radio("בחר/י תצורה:",["ממשק טפסים","עוזר אישי (צ'אט)"])
 
 # ===================================================
@@ -75,7 +74,7 @@ if MODE=="ממשק טפסים":
         t_sel = st.selectbox("מורה חסרה",TEACHERS)
         d_sel = st.selectbox("יום בשבוע",DAYS)
         if st.button("מצא חלופות",use_container_width=True):
-            res=find_subs(t_sel,d_sel)
+            res = find_subs(t_sel,d_sel)
             if res=="DAY_OFF":
                 st.info(f"✋ {t_sel} בחופש ביום {d_sel} – אין צורך בחלופה.")
             else:
@@ -92,11 +91,12 @@ if MODE=="ממשק טפסים":
 
     with tab_cal:
         st.title("📅 לוח שעות – כל המורות")
-        st.markdown("<span style='font-size:0.9rem;'>🟩 שהייה&nbsp;&nbsp;🟦 פרטני&nbsp;&nbsp;⬜ מקצוע&nbsp;&nbsp;⬜ יום חופשי</span>",
-                    unsafe_allow_html=True)
+        st.markdown(
+            "<span style='font-size:0.9rem;'>🟩 שהייה&nbsp;&nbsp;🟦 פרטני&nbsp;&nbsp;⬜ מקצוע&nbsp;&nbsp;⬜ יום חופשי</span>",
+            unsafe_allow_html=True)
         for t in TEACHERS:
             with st.expander(f"📋 {t}",expanded=False):
-                styled=teacher_matrix(t).style.map(color_cells)
+                styled = teacher_matrix(t).style.map(color_cells)
                 st.dataframe(styled,use_container_width=True,height=240)
 
 # ===================================================
@@ -105,32 +105,34 @@ if MODE=="ממשק טפסים":
 else:
     st.title("🤖 עוזר אישי למציאת מחליפות")
 
-    # --- state init ---
-    GREETING = "שלום גלית! אני העוזר האישי שלך למציאת מחליפות 😊\nאיזו מורה נעדרת היום?"
+    # --- אתחול state ---
     if 'hist' not in st.session_state:
-        st.session_state.hist   = []
+        st.session_state.hist    = []
         st.session_state.greeted = False
-        st.session_state.stage  = "teacher"
-        st.session_state.teacher=""
-        st.session_state.day    =""
+        st.session_state.stage   = "teacher"
+        st.session_state.teacher = ""
 
+    def bot(msg):  st.session_state.hist.append(("bot",msg))
+    def user(msg): st.session_state.hist.append(("user",msg))
+
+    # --- ברכה יחידה ---
+    GREET = "שלום גלית! אני העוזר האישי שלך למציאת מחליפות 😊\nאיזו מורה נעדרת היום?"
     if not st.session_state.greeted:
-        st.session_state.hist.append(("bot",GREETING))
+        st.session_state.hist.append(("bot",GREET))
         st.session_state.greeted = True
 
-    def bot(txt):  st.session_state.hist.append(("bot",txt))
-    def user(txt): st.session_state.hist.append(("user",txt))
-
+    # --- chat render ---
+    chat = st.container()
     def redraw():
-        st.container().empty()
+        chat.empty()
         for role,msg in st.session_state.hist:
-            with st.chat_message("assistant" if role=="bot" else "user"):
+            with chat.chat_message("assistant" if role=="bot" else "user"):
                 st.markdown(msg)
     redraw()
 
     # --- callbacks ---
     def choose_teacher():
-        t = st.session_state.sel_teacher
+        t=st.session_state.sel_teacher
         if t:
             user(t)
             st.session_state.teacher=t
@@ -139,7 +141,7 @@ else:
             redraw()
 
     def choose_day():
-        d = st.session_state.sel_day
+        d=st.session_state.sel_day
         if d:
             user(d)
             res=find_subs(st.session_state.teacher,d)
@@ -153,15 +155,13 @@ else:
                     if subs is None:
                         ans+="▪️ אין צורך בחלופה\n"
                     elif subs:
-                        ans+="▪️ חלופה: " + " / ".join(f"{t} ({s})" for _,t,s in subs) + "\n"
+                        ans+="▪️ חלופה: "+" / ".join(f"{t} ({s})" for _,t,s in subs)+"\n"
                     else:
                         ans+="▪️ אין חלופה זמינה\n"
             bot(ans)
             bot("אם תרצי שוב – בחרי מורה חדשה 😊")
-
             # reset
             st.session_state.stage="teacher"
-            st.session_state.teacher=""
             st.session_state.sel_teacher=""
             st.session_state.sel_day=""
             redraw()
@@ -172,7 +172,6 @@ else:
                      [""]+TEACHERS,
                      key="sel_teacher",
                      on_change=choose_teacher)
-
     elif st.session_state.stage=="day":
         st.selectbox("בחרי יום:",
                      [""]+DAYS,
