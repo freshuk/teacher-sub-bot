@@ -19,6 +19,11 @@ section[data-testid="stSidebar"]{display:none;}
 .stSelectbox div[data-baseweb="select"] > div {
     background-color: #d2e1ff; /* צבע רקע כמו של כפתור משתמש */
 }
+/* ### שינוי 1: הוספת קלאס ליישור לימין ### */
+.rtl-block {
+    direction: rtl;
+    text-align: right;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -33,10 +38,7 @@ else:
 # ───────── נתונים וקבועים ─────────
 DAYS=['יום א','יום ב','יום ג','יום ד','יום ה','יום ו']
 DAY_OFF='יום חופשי'
-
-### שינוי: רשימת מילות מפתח למורים פנויים / שיעורים ללא צורך בהחלפה ###
 AVAILABLE_KEYWORDS = ["שהייה", "פרטני", "תגבור", "הדרכה", "מצטיינים", "שילוב"]
-# הגדרת עדיפות - שהייה הכי גבוהה (הכי זמין), פרטני שני וכו'
 PRIORITY = {key: i for i, key in enumerate(AVAILABLE_KEYWORDS)}
 
 
@@ -113,7 +115,6 @@ def render_chat(container):
 
 chat_container = st.container()
 
-### שינוי: לוגיקה מעודכנת בפונקציית החיפוש ###
 # ───────── substitute fn ─────────
 def find_subs(t,day,start, end):
     rows=df[(df.teacher==t)&(df.day==day)]
@@ -123,9 +124,8 @@ def find_subs(t,day,start, end):
     for h in range(start, end + 1):
         subj=absmap.get(h,'—')
         
-        # בדיקה אם השיעור של המורה הנעדרת דורש החלפה
         if any(keyword in subj for keyword in AVAILABLE_KEYWORDS):
-            out[h]=(subj,None) # None = אין צורך בחלופה
+            out[h]=(subj,None)
             continue
         
         opts=[]
@@ -135,15 +135,11 @@ def find_subs(t,day,start, end):
             if rec.empty: continue
             
             stat=rec.iloc[0].subject
-            # בדיקה אם המורה המועמדת פנויה (כלומר, השיעור שלה מכיל אחת ממילות המפתח)
-            is_available = False
             for keyword in AVAILABLE_KEYWORDS:
                 if keyword in stat:
-                    is_available = True
-                    # קביעת עדיפות לפי מילת המפתח שנמצאה
                     priority = PRIORITY.get(keyword, 99)
                     opts.append((priority, cand, stat))
-                    break # מצאנו מילת מפתח, אין צורך להמשיך לבדוק את השאר עבור מורה זו
+                    break
         
         opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
         out[h]=(subj,opts)
@@ -201,14 +197,18 @@ def calculate():
     if res=="DAY_OFF":
         add("bot",f"✋ **{st.session_state.teacher}** בחופש ביום **{st.session_state.day}** – אין צורך בחלופה.")
     else:
-        txt=f"להלן החלופות למורה **{st.session_state.teacher}** ביום **{st.session_state.day}**:\n"
+        txt=f"להלן החלופות למורה **{st.session_state.teacher}** ביום **{st.session_state.day}**:<br>"
         for h in range(st.session_state.start, st.session_state.end + 1):
             subj,subs=res.get(h, ('—', []))
-            txt+=f"\n**🕐 שעה {h}** – {subj}\n"
-            if subs is None: txt+="▪️ אין צורך בחלופה\n"
-            elif subs: txt+= "▪️ חלופה: " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "\n"
-            else: txt+="▪️ אין חלופה זמינה\n"
-        add("bot",txt)
+            txt+=f"<br>**🕐 שעה {h}** – {subj}<br>"
+            if subs is None: txt+="▪️ אין צורך בחלופה<br>"
+            elif subs: txt+= "▪️ חלופה: " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "<br>"
+            else: txt+="▪️ אין חלופה זמינה<br>"
+        
+        ### שינוי 2: עטיפת הטקסט ב-div עם הקלאס החדש ###
+        rtl_txt = f'<div class="rtl-block">{txt}</div>'
+        add("bot", rtl_txt)
+
     add("bot","שמחתי לעזור! תמיד כאן לשירותך, צמרובוט 🌸")
     st.session_state.stage="done"
 
