@@ -12,7 +12,7 @@ import base64
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-/* ... (כל ה-CSS נשאר זהה) ... */
+/* ... (CSS נשאר כמעט זהה) ... */
 .main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
 .main-header img { width: 80px !important; margin-bottom: 0.5rem; }
 .main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
@@ -92,26 +92,23 @@ if not df.empty:
 else:
     TEACHERS = []
 
-### שינוי 2: לוגיקה לזכירת הטאב הפעיל ###
-def on_tab_change():
-    st.session_state.active_tab = st.session_state.tabs_key
-
+### שינוי: החלפת st.tabs ב-st.radio לניהול מצב נכון ###
 tab_names = ["🤖 מצא מחליף", "📅 צפה במערכת"]
-if 'active_tab' not in st.session_state:
-    st.session_state.active_tab = tab_names[0]
-
-tab1, tab2 = st.tabs(tab_names, key='tabs_key', on_change=on_tab_change)
-
+active_tab = st.radio(
+    "ניווט", tab_names,
+    horizontal=True,
+    label_visibility="collapsed",
+    key="active_tab_radio"
+)
 
 # ──────────────────────────────────────────────────────────
-# ─────────── טאב 1: מצא מחליף (הקוד הקיים) ──────────────
+# ─────────── לוגיקה עבור הטאב הראשון ──────────────
 # ──────────────────────────────────────────────────────────
-with tab1:
+if active_tab == tab_names[0]:
     if "chat" not in st.session_state:
         st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 במה אני יכול לעזור לך היום?")]
         st.session_state.stage="teacher"
     
-    ### שינוי 1: פונקציית גלילה ###
     def scroll_to_bottom():
         components.html("""
             <script>
@@ -122,7 +119,7 @@ with tab1:
     def add(role,msg):
         if not st.session_state.chat or st.session_state.chat[-1]!=(role,msg):
             st.session_state.chat.append((role,msg))
-            scroll_to_bottom() # קריאה לגלילה אחרי כל הוספת הודעה
+            scroll_to_bottom()
 
     def render_chat(container):
         with container:
@@ -256,16 +253,18 @@ with tab1:
     render_chat(chat_container)
     st.divider()
     if st.button("🗑️ נקה מסך"):
-        keys_to_keep = ['active_tab', 'tabs_key'] # שמירה על מצב הטאבים
+        keys_to_keep = ['active_tab_radio'] # שמירה על מצב הטאבים
         for key in list(st.session_state.keys()):
             if key not in keys_to_keep:
                 del st.session_state[key]
         st.rerun()
+    
+    scroll_to_bottom()
 
 # ──────────────────────────────────────────────────────────
-# ─────────── טאב 2: צפייה במערכת שעות ──────────────
+# ─────────── לוגיקה עבור הטאב השני ──────────────
 # ──────────────────────────────────────────────────────────
-with tab2:
+elif active_tab == tab_names[1]:
     st.subheader("מערכת שעות שבועית")
 
     if not TEACHERS:
@@ -304,7 +303,3 @@ with tab2:
                     schedule_pivot.style.apply(lambda x: x.map(color_schedule)),
                     use_container_width=True
                 )
-
-# הגלילה תתבצע רק בטאב של הצ'אט, אין צורך בה בסוף
-if st.session_state.active_tab == tab_names[0]:
-    scroll_to_bottom()
