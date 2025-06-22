@@ -54,8 +54,6 @@ df=df()
 if "chat" not in st.session_state:
     st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 במה אני יכול לעזור לך היום?")]
     st.session_state.stage="teacher"
-    st.session_state.done_teacher=""
-    st.session_state.done_day=""
 
 # ───────── chat helpers ─────────
 def add(role,msg):
@@ -68,7 +66,6 @@ def render_chat(container):
             cls="chat-msg chat-user" if r=="user" else "chat-msg"
             st.markdown(f"<div class='{cls}'>{m}</div>",unsafe_allow_html=True)
 
-# === תיקון 1: יצירת מיכל ריק עבור הצ'אט שיוצג בסוף ===
 chat_container = st.container()
 
 # ───────── substitute fn ─────────
@@ -91,25 +88,23 @@ def find_subs(t,day,start):
         out[h]=(subj,opts)
     return out
 
-# ───────── callbacks (מתוקנות) ─────────
+# ───────── callbacks ─────────
 def choose_teacher():
     t=st.session_state.sel_teacher
-    if t and t!=st.session_state.done_teacher:
+    if t:
         add("user",t)
         st.session_state.teacher=t
         st.session_state.stage="day"
         add("bot",f"מעולה, בחרנו במורה **{t}**.\nלאיזה יום היא נעדרת?")
-        st.session_state.done_teacher=t
         st.session_state.sel_teacher=""
 
 def choose_day():
     d=st.session_state.sel_day
-    if d and d!=st.session_state.done_day:
+    if d:
         add("user",d)
         st.session_state.day=d
         st.session_state.stage="scope"
         add("bot","היא נעדרת **יום שלם** או **מ-שעה**?")
-        st.session_state.done_day=d
         st.session_state.sel_day=""
 
 def choose_scope():
@@ -120,7 +115,7 @@ def choose_scope():
         st.session_state.start=1
         calculate()
     elif sc=="מ-שעה":
-        st.session_state.stage="hour" # שינוי המצב לשלב הבא
+        st.session_state.stage="hour"
 
 def choose_hour():
     hr=st.session_state.sel_hr
@@ -144,22 +139,48 @@ def calculate():
             else: txt+="▪️ אין חלופה זמינה\n"
         add("bot",txt)
     add("bot","שמחתי לעזור! תמיד כאן לשירותך, צמרובוט 🌸")
-    # איפוס התהליך
-    st.session_state.stage="teacher"
-    st.session_state.done_teacher=""
-    st.session_state.done_day=""
+    ### שיפור 2: מעבר למצב סיום במקום איפוס מיידי ###
+    st.session_state.stage="done"
 
-# === תיקון 2: חלוקה ברורה לשלבים לוגיים ===
-# ───────── dynamic widgets ─────────
-if st.session_state.stage=="teacher":
-    st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher)
-elif st.session_state.stage=="day":
-    st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day)
-elif st.session_state.stage=="scope":
+def start_new_search():
+    ### שיפור 2: פונקציה להתחלת חיפוש חדש ###
+    st.session_state.stage="teacher"
+    add("bot", "במה עוד אוכל לעזור?")
+
+### שיפור 3: פונקציות נפרדות להצגת הווידג'טים ###
+def display_teacher_selection():
+    st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher,
+                 label_visibility="collapsed") ### שיפור 1 ###
+
+def display_day_selection():
+    st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day,
+                 label_visibility="collapsed") ### שיפור 1 ###
+
+def display_scope_selection():
     st.radio("",("יום שלם","מ-שעה"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
-elif st.session_state.stage == "hour":
+
+def display_hour_selection():
     add("bot", "בחרי שעת התחלה (1-6):")
-    st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,7)], key="sel_hr",on_change=choose_hour)
+    st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,7)], key="sel_hr",on_change=choose_hour,
+                 label_visibility="collapsed") ### שיפור 1 ###
+
+def display_done_state():
+    st.button("🔎 חיפוש חדש", on_click=start_new_search) ### שיפור 2 ###
+
+
+# ───────── dynamic widgets (Main Logic) ─────────
+stage = st.session_state.get('stage', 'teacher')
+
+if stage =="teacher":
+    display_teacher_selection()
+elif stage =="day":
+    display_day_selection()
+elif stage =="scope":
+    display_scope_selection()
+elif stage == "hour":
+    display_hour_selection()
+elif stage == "done":
+    display_done_state()
 
 # === הצגת הצ'אט בתוך המיכל הריק, אחרי כל הלוגיקה ===
 render_chat(chat_container)
@@ -167,8 +188,7 @@ render_chat(chat_container)
 # ───────── ניקוי מסך ─────────
 st.divider()
 if st.button("🗑️ נקה מסך"):
-    # דרך בטוחה לאפס את כל המצבים
-    keys_to_keep = [] # ניתן להוסיף כאן מפתחות שרוצים לשמור
+    keys_to_keep = []
     for key in list(st.session_state.keys()):
         if key not in keys_to_keep:
             del st.session_state[key]
