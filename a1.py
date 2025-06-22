@@ -104,7 +104,7 @@ def choose_day():
         add("user",d)
         st.session_state.day=d
         st.session_state.stage="scope"
-        add("bot","היא נעדרת **יום שלם** או **מ-שעה**?")
+        add("bot","היא נעדרת **יום שלם** או **בטווח שעות**?")
         st.session_state.sel_day=""
 
 def choose_scope():
@@ -113,27 +113,40 @@ def choose_scope():
     add("user", sc)
     if sc=="יום שלם":
         st.session_state.start=1
+        st.session_state.end=6  # ### שינוי: הגדרת שעת סיום ליום שלם
         calculate()
-    elif sc=="מ-שעה":
+    elif sc=="בטווח שעות": # ### שינוי: טקסט מעודכן
         st.session_state.stage="hour"
 
 def choose_hour():
     hr=st.session_state.sel_hr
     if hr:
-        add("user",f"שעה {hr}")
+        add("user",f"משעה {hr}")
         st.session_state.start=int(hr)
+        st.session_state.stage="end_hour" # ### שינוי: מעבר לשלב בחירת שעת סיום
         st.session_state.sel_hr=""
+
+### שינוי: פונקציה חדשה לבחירת שעת סיום ###
+def choose_end_hour():
+    end_hr = st.session_state.sel_end_hr
+    if end_hr:
+        add("user", f"עד שעה {end_hr}")
+        st.session_state.end = int(end_hr)
+        st.session_state.sel_end_hr = ""
         calculate()
 
 def calculate():
     with st.spinner("צמרובוט חושב…"): time.sleep(1.1)
+    # ### שינוי: הלוגיקה משתמשת ב-start ו-end
     res=find_subs(st.session_state.teacher,st.session_state.day,st.session_state.start)
     if res=="DAY_OFF":
         add("bot",f"✋ **{st.session_state.teacher}** בחופש ביום **{st.session_state.day}** – אין צורך בחלופה.")
     else:
         txt=f"להלן החלופות למורה **{st.session_state.teacher}** ביום **{st.session_state.day}**:\n"
-        for h in range(st.session_state.start,7):
-            subj,subs=res[h]; txt+=f"\n**🕐 שעה {h}** – {subj}\n"
+        # ### שינוי: הלולאה רצה על טווח השעות שנבחר
+        for h in range(st.session_state.start, st.session_state.end + 1):
+            subj,subs=res.get(h, ('—', [])) # שימוש ב-get למקרה שהשעה לא קיימת
+            txt+=f"\n**🕐 שעה {h}** – {subj}\n"
             if subs is None: txt+="▪️ אין צורך בחלופה\n"
             elif subs: txt+= "▪️ חלופה: " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "\n"
             else: txt+="▪️ אין חלופה זמינה\n"
@@ -143,7 +156,6 @@ def calculate():
 
 def start_new_search():
     st.session_state.stage="teacher"
-    ### שינוי: הודעה ברורה יותר להתחלת חיפוש חדש ###
     add("bot", "בטח, נתחיל מחדש. איזו מורה נעדרת הפעם?")
 
 # ───────── פונקציות להצגת הווידג'טים ─────────
@@ -156,11 +168,21 @@ def display_day_selection():
                  label_visibility="collapsed")
 
 def display_scope_selection():
-    st.radio("",("יום שלם","מ-שעה"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
+    # ### שינוי: טקסט מעודכן
+    st.radio("",("יום שלם","בטווח שעות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
 
 def display_hour_selection():
     add("bot", "בחרי שעת התחלה (1-6):")
     st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,7)], key="sel_hr",on_change=choose_hour,
+                 label_visibility="collapsed")
+
+### שינוי: פונקציה חדשה להצגת בחירת שעת סיום ###
+def display_end_hour_selection():
+    add("bot", "עד איזו שעה?")
+    # האפשרויות לשעת סיום מתחילות משעת ההתחלה שנבחרה
+    start_hour = st.session_state.get('start', 1)
+    options = [str(i) for i in range(start_hour, 7)]
+    st.selectbox("שעת סיום:", [""] + options, key="sel_end_hr", on_change=choose_end_hour,
                  label_visibility="collapsed")
 
 def display_done_state():
@@ -178,6 +200,9 @@ elif stage =="scope":
     display_scope_selection()
 elif stage == "hour":
     display_hour_selection()
+### שינוי: הוספת השלב החדש ללוגיקה הראשית ###
+elif stage == "end_hour":
+    display_end_hour_selection()
 elif stage == "done":
     display_done_state()
 
