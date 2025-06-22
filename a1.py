@@ -12,9 +12,27 @@ st.set_page_config(page_title="צמרובוט – העוזר האישי שלי",
 st.markdown("""
 <style>
 /* General Styles */
-h1 {font-size:1.8rem; font-weight:800; margin-bottom:0.4rem; display:inline-block;}
 button, select, input, label {font-size:1rem;}
 section[data-testid="stSidebar"] {display:none;}
+
+/* ### שיפור 3 (גישה חדשה): עיצוב כותרת עם HTML ### */
+.main-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+.main-header img {
+    width: 80px !important;
+    margin-bottom: 0.5rem;
+}
+.main-header h3 {
+    font-size: 1.8rem;
+    font-weight: 800;
+    text-align: center;
+    width: 100%;
+}
 
 /* Chat Bubble Styles */
 .chat-msg {
@@ -29,64 +47,41 @@ section[data-testid="stSidebar"] {display:none;}
 
 /* RTL & Alignment */
 .rtl-block {direction: rtl; text-align: right;}
-/* ### שיפור 2: יישור כפתורי הרדיו לימין ### */
-div[role="radiogroup"] {
+/* ### שיפור 2 (גישה חדשה): יישור כפתורי הרדיו לימין עם סלקטור חזק יותר ### */
+div[data-testid="stRadio"] > div {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
     direction: rtl;
-    justify-content: flex-end;
 }
-div[role="radiogroup"] > label {
-    margin-right: 0 !important;
+div[data-testid="stRadio"] label {
     margin-left: 0.5rem !important;
+    margin-right: 0 !important;
 }
 
-/* Schedule Table Styles */
-.schedule-table {width: 100%; border-collapse: collapse; direction: rtl;}
-.schedule-table th, .schedule-table td {border: 1px solid #ddd; padding: 8px; text-align: center;}
-.schedule-table th {background-color: #f2f2f2;}
-
-/* ### שיפור 3: עיצוב כותרת למובייל ### */
-@media (max-width: 640px) {
-    .main-header {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    .main-header img {
-        width: 80px !important; /* הגדלת האייקון */
-        margin-bottom: 0.5rem;
-    }
-    .main-header h3 {
-        width: 100%;
-        text-align: center;
-    }
-}
 </style>
 """, unsafe_allow_html=True)
 
-# ───────── אייקון וכותרת ─────────
-# שימוש ב-st.columns כדי שנוכל להחיל קלאס CSS על הקונטיינר
-header_cols = st.columns([1, 9])
-with header_cols[0]:
-    if Path("bot_calendar.png").exists():
-        st.image("bot_calendar.png", width=60)
-    else:
-        st.title("🤖")
-with header_cols[1]:
-    st.markdown("### צמרובוט – העוזר האישי שלי")
+# ───────── אייקון וכותרת (גישה חדשה) ─────────
+# נשתמש ב-st.markdown כדי ליצור את הכותרת עם HTML ו-CSS
+# נצטרך להמיר את התמונה ל-base64 כדי להטמיע אותה ישירות
+import base64
 
-# הוספת קלאס CSS לכל הקונטיינר של הכותרת
-st.markdown('<div class="main-header-wrapper"></div>', unsafe_allow_html=True)
-# This is a bit of a hack to apply the class to the columns container
-components.html("""
-<script>
-    const header = window.parent.document.querySelector('div[data-testid="stHorizontalBlock"]');
-    if (header) {
-        header.classList.add('main-header');
-    }
-</script>
-""", height=0)
+def get_image_as_base64(path):
+    if not Path(path).exists():
+        return None
+    with open(path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+img_base64 = get_image_as_base64("bot_calendar.png")
+if img_base64:
+    st.markdown(f"""
+    <div class="main-header">
+        <img src="data:image/png;base64,{img_base64}" alt="Bot Icon">
+        <h3>צמרובוט – העוזר האישי שלי</h3>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown('<div class="main-header"><h3>🤖 צמרובוט – העוזר האישי שלי</h3></div>', unsafe_allow_html=True)
 
 
 # ───────── נתונים וקבועים ─────────
@@ -95,7 +90,6 @@ DAY_OFF='יום חופשי'
 AVAILABLE_KEYWORDS = ["שהייה", "פרטני", "תגבור", "הדרכה", "מצטיינים", "שילוב"]
 PRIORITY = {key: i for i, key in enumerate(AVAILABLE_KEYWORDS)}
 
-### שיפור 4: הצגת הודעת טעינה ###
 @st.cache_data(ttl=600, show_spinner="טוען מערכת שעות עדכנית...")
 def load_data_from_gsheet():
     # ... (הפונקציה נשארת זהה)
@@ -327,7 +321,6 @@ with tab2:
                     aggfunc='first'
                 )
                 
-                # מילוי שעות חסרות כדי לקבל טבלה מלאה מ-1 עד 9
                 all_hours = pd.Index(range(1, 10), name='hour')
                 schedule_pivot = schedule_pivot.reindex(all_hours).fillna('')
 
@@ -335,19 +328,15 @@ with tab2:
                 schedule_pivot = schedule_pivot[ordered_days]
                 schedule_pivot.index.name = "שעה"
 
-                ### שיפור 1: פונקציית צביעה ###
                 def color_schedule(val):
                     if any(keyword in str(val) for keyword in AVAILABLE_KEYWORDS):
-                        # צבע ירוק בהיר לשיעורים "פנויים"
                         return 'background-color: #e6ffed'
                     elif val == '':
-                        # צבע אפור בהיר לתאים ריקים (לא בבית הספר)
                         return 'background-color: #f0f2f6'
                     else:
-                        # צבע ברירת מחדל
                         return ''
 
                 st.dataframe(
-                    schedule_pivot.style.applymap(color_schedule),
+                    schedule_pivot.style.apply(lambda x: x.map(color_schedule)),
                     use_container_width=True
                 )
