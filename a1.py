@@ -3,6 +3,8 @@ import pandas as pd
 import time
 from pathlib import Path
 import streamlit.components.v1 as components
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # ───────── הגדרות בסיס + CSS ─────────
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
@@ -28,27 +30,76 @@ else:
     st.title("🤖 צמרובוט – העוזר האישי שלי")
 
 # ───────── נתונים וקבועים ─────────
-DATA="schedule.csv"
-TEACHERS=['דנה','לילך','רעות','ליאת','לימור']
-DAYS=['ראשון','שני','שלישי','רביעי','חמישי','שישי']
+DAYS=['יום א','יום ב','יום ג','יום ד','יום ה','יום ו']
 DAY_OFF='יום חופשי'
 PRIORITY={'שהייה':1,'פרטני':2}
 
-@st.cache_data
-def df():
-    # יצירת קובץ דמה אם לא קיים
-    if not Path(DATA).exists():
-        data = {
-            'teacher': ['דנה']*6 + ['לילך']*6 + ['רעות']*6,
-            'day': ['ראשון']*6 + ['ראשון']*6 + ['ראשון']*6,
-            'hour': list(range(1, 7)) * 3,
-            'subject': ['חשבון', 'שפה', 'פרטני', 'מדעים', 'שהייה', 'אנגלית'] +
-                       ['שהייה', 'ספורט', 'תורה', 'פרטני', 'אומנות', 'מוזיקה'] +
-                       ['גיאומטריה', 'היסטוריה', 'אנגלית', 'שפה', 'שהייה', 'פרטני']
-        }
-        pd.DataFrame(data).to_csv(DATA, index=False)
-    d=pd.read_csv(DATA,dtype=str); d['hour']=d['hour'].astype(int); return d
-df=df()
+### שינוי מרכזי: פונקציה לקריאה ועיבוד הנתונים מגוגל שיטס ###
+@st.cache_data(ttl=600) # שמירה בזיכרון המטמון ל-10 דקות
+def load_data_from_gsheet():
+    try:
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+        client = gspread.authorize(creds)
+
+        spreadsheet = client.open("מורים")
+        worksheet = spreadsheet.worksheet("גיליון1")
+        
+        data = worksheet.get_all_values()
+    except gspread.exceptions.SpreadsheetNotFound:
+        st.error("שגיאה: לא נמצא קובץ גוגל שיטס בשם 'מורים'. ודא שהשם נכון ושיתפת את הקובץ עם המייל של הבוט.")
+        return pd.DataFrame()
+    except gspread.exceptions.WorksheetNotFound:
+        st.error("שגיאה: לא נמצא גיליון בשם 'גיליון1' בתוך הקובץ. ודא שהשם נכון.")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"שגיאה כללית בהתחברות לגוגל שיטס: {e}")
+        return pd.DataFrame()
+
+    all_records = []
+    current_teacher = None
+    header_row = []
+    
+    for row in data:
+        if not any(row): continue # דילוג על שורות ריקות
+
+        if row[0].startswith("מערכת שעות למורה"):
+            current_teacher = row[0].replace("מערכת שעות למורה", "").strip()
+            continue
+
+        if row[0] == 'שעה' and current_teacher:
+            header_row = [h.strip() for h in row]
+            continue
+
+        if row[0].isdigit() and current_teacher and header_row:
+            hour = int(row[0])
+            for i, day_header in enumerate(header_row):
+                if day_header in DAYS:
+                    if i < len(row) and row[i]:
+                        subject = row[i].replace('\n', ' ').strip()
+                        
+                        if '.' in subject:
+                            subject = subject.split('.')[0]
+
+                        record = {
+                            'teacher': current_teacher,
+                            'day': day_header,
+                            'hour': hour,
+                            'subject': subject
+                        }
+                        all_records.append(record)
+
+    df = pd.DataFrame(all_records)
+    if df.empty:
+        st.warning("לא נמצאו נתונים בפורמט הצפוי בגוגל שיטס.")
+    return df
+
+# טעינת הנתונים
+df = load_data_from_gsheet()
+if not df.empty:
+    TEACHERS = sorted(df['teacher'].unique())
+else:
+    TEACHERS = [] # אם יש שגיאה, הרשימה תהיה ריקה
 
 # ───────── init state ─────────
 if "chat" not in st.session_state:
@@ -69,21 +120,21 @@ def render_chat(container):
 chat_container = st.container()
 
 # ───────── substitute fn ─────────
-def find_subs(t,day,start):
+def find_subs(t,day,start, end):
     rows=df[(df.teacher==t)&(df.day==day)]
     if not rows.empty and (rows.subject==DAY_OFF).all(): return "DAY_OFF"
     absmap={r.hour:r.subject for _,r in rows.iterrows()}
     out={}
-    for h in range(start,7):
+    for h in range(start, end + 1):
         subj=absmap.get(h,'—')
-        if subj in ('פרטני',DAY_OFF): out[h]=(subj,None); continue
+        if subj in ('פרטני', DAY_OFF, 'שהייה', 'הדרכה', 'תגבור'): out[h]=(subj,None); continue
         opts=[]
         for cand in TEACHERS:
             if cand==t: continue
             rec=df[(df.teacher==cand)&(df.day==day)&(df.hour==h)]
             if rec.empty: continue
             stat=rec.iloc[0].subject
-            if stat in PRIORITY: opts.append((PRIORITY[stat],cand,stat))
+            if stat in PRIORITY: opts.append((PRIORITY.get(stat, 99),cand,stat))
         opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
         out[h]=(subj,opts)
     return out
@@ -113,9 +164,9 @@ def choose_scope():
     add("user", sc)
     if sc=="יום שלם":
         st.session_state.start=1
-        st.session_state.end=6  # ### שינוי: הגדרת שעת סיום ליום שלם
+        st.session_state.end=9 # ניתן להתאים למספר השעות המקסימלי
         calculate()
-    elif sc=="בטווח שעות": # ### שינוי: טקסט מעודכן
+    elif sc=="בטווח שעות":
         st.session_state.stage="hour"
 
 def choose_hour():
@@ -123,10 +174,9 @@ def choose_hour():
     if hr:
         add("user",f"משעה {hr}")
         st.session_state.start=int(hr)
-        st.session_state.stage="end_hour" # ### שינוי: מעבר לשלב בחירת שעת סיום
+        st.session_state.stage="end_hour"
         st.session_state.sel_hr=""
 
-### שינוי: פונקציה חדשה לבחירת שעת סיום ###
 def choose_end_hour():
     end_hr = st.session_state.sel_end_hr
     if end_hr:
@@ -137,15 +187,13 @@ def choose_end_hour():
 
 def calculate():
     with st.spinner("צמרובוט חושב…"): time.sleep(1.1)
-    # ### שינוי: הלוגיקה משתמשת ב-start ו-end
-    res=find_subs(st.session_state.teacher,st.session_state.day,st.session_state.start)
+    res=find_subs(st.session_state.teacher,st.session_state.day,st.session_state.start, st.session_state.end)
     if res=="DAY_OFF":
         add("bot",f"✋ **{st.session_state.teacher}** בחופש ביום **{st.session_state.day}** – אין צורך בחלופה.")
     else:
         txt=f"להלן החלופות למורה **{st.session_state.teacher}** ביום **{st.session_state.day}**:\n"
-        # ### שינוי: הלולאה רצה על טווח השעות שנבחר
         for h in range(st.session_state.start, st.session_state.end + 1):
-            subj,subs=res.get(h, ('—', [])) # שימוש ב-get למקרה שהשעה לא קיימת
+            subj,subs=res.get(h, ('—', []))
             txt+=f"\n**🕐 שעה {h}** – {subj}\n"
             if subs is None: txt+="▪️ אין צורך בחלופה\n"
             elif subs: txt+= "▪️ חלופה: " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "\n"
@@ -160,6 +208,9 @@ def start_new_search():
 
 # ───────── פונקציות להצגת הווידג'טים ─────────
 def display_teacher_selection():
+    if not TEACHERS:
+        st.warning("לא נטענו מורים. בדוק את החיבור לגוגל שיטס ואת מבנה הקובץ.")
+        return
     st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher,
                  label_visibility="collapsed")
 
@@ -168,20 +219,17 @@ def display_day_selection():
                  label_visibility="collapsed")
 
 def display_scope_selection():
-    # ### שינוי: טקסט מעודכן
     st.radio("",("יום שלם","בטווח שעות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
 
 def display_hour_selection():
-    add("bot", "בחרי שעת התחלה (1-6):")
-    st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,7)], key="sel_hr",on_change=choose_hour,
+    add("bot", "בחרי שעת התחלה (1-9):")
+    st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,10)], key="sel_hr",on_change=choose_hour,
                  label_visibility="collapsed")
 
-### שינוי: פונקציה חדשה להצגת בחירת שעת סיום ###
 def display_end_hour_selection():
     add("bot", "עד איזו שעה?")
-    # האפשרויות לשעת סיום מתחילות משעת ההתחלה שנבחרה
     start_hour = st.session_state.get('start', 1)
-    options = [str(i) for i in range(start_hour, 7)]
+    options = [str(i) for i in range(start_hour, 10)]
     st.selectbox("שעת סיום:", [""] + options, key="sel_end_hr", on_change=choose_end_hour,
                  label_visibility="collapsed")
 
@@ -200,7 +248,6 @@ elif stage =="scope":
     display_scope_selection()
 elif stage == "hour":
     display_hour_selection()
-### שינוי: הוספת השלב החדש ללוגיקה הראשית ###
 elif stage == "end_hour":
     display_end_hour_selection()
 elif stage == "done":
