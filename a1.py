@@ -252,17 +252,19 @@ if active_tab == tab_names[0]:
         st.rerun()
     
     ### שינוי: קריאה לגלילה אוטומטית בסוף הטאב ###
+    # This is the "Anchor Hack" for reliable auto-scrolling
+    st.markdown('<div id="end-of-chat-anchor" style="height: 0px;"></div>', unsafe_allow_html=True)
     components.html(
         """
-        <div id="end-of-chat-anchor" style="height: 1px; margin-top: -1px;"></div>
         <script>
-            // Small delay to allow the DOM to update
-            setTimeout(function() {
-                var anchor = window.parent.document.getElementById("end-of-chat-anchor");
-                if (anchor) {
+            // We target the anchor element within the parent document
+            const anchor = window.parent.document.getElementById("end-of-chat-anchor");
+            if (anchor) {
+                // The timeout is crucial to wait for the DOM to be updated.
+                setTimeout(() => {
                     anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                }
-            }, 250); // Increased delay for more reliability
+                }, 250);
+            }
         </script>
         """,
         height=0,
