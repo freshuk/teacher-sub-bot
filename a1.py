@@ -6,6 +6,7 @@ import streamlit.components.v1 as components
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import re
+import base64
 
 # ───────── הגדרות בסיס + CSS ─────────
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
@@ -15,7 +16,7 @@ st.markdown("""
 button, select, input, label {font-size:1rem;}
 section[data-testid="stSidebar"] {display:none;}
 
-/* ### שיפור 3 (גישה חדשה): עיצוב כותרת עם HTML ### */
+/* Header Styles */
 .main-header {
     display: flex;
     flex-direction: column;
@@ -41,34 +42,28 @@ section[data-testid="stSidebar"] {display:none;}
     padding:0.7rem 1rem;
     margin:0.3rem 0;
     color: #31333F;
+    /* ### שינוי מרכזי: החלת RTL על כל בועות הצ'אט ### */
+    direction: rtl;
+    text-align: right;
 }
 .chat-user {background:#d2e1ff;}
 .stSelectbox div[data-baseweb="select"] > div {background-color: #d2e1ff;}
 
-/* RTL & Alignment */
-.rtl-block {direction: rtl; text-align: right;}
-/* ### שיפור 2 (גישה חדשה): יישור כפתורי הרדיו לימין עם סלקטור חזק יותר ### */
+/* RTL Widgets Alignment */
 div[data-testid="stRadio"] > div {
     flex-direction: row-reverse;
     justify-content: flex-start;
-    direction: rtl;
 }
 div[data-testid="stRadio"] label {
     margin-left: 0.5rem !important;
     margin-right: 0 !important;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
-# ───────── אייקון וכותרת (גישה חדשה) ─────────
-# נשתמש ב-st.markdown כדי ליצור את הכותרת עם HTML ו-CSS
-# נצטרך להמיר את התמונה ל-base64 כדי להטמיע אותה ישירות
-import base64
-
+# ───────── אייקון וכותרת ─────────
 def get_image_as_base64(path):
-    if not Path(path).exists():
-        return None
+    if not Path(path).exists(): return None
     with open(path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode()
 
@@ -153,7 +148,6 @@ tab1, tab2 = st.tabs(["🤖 מצא מחליף", "📅 צפה במערכת"])
 # ─────────── טאב 1: מצא מחליף (הקוד הקיים) ──────────────
 # ──────────────────────────────────────────────────────────
 with tab1:
-    # ... (כל הקוד של טאב 1 נשאר זהה לחלוטין) ...
     if "chat" not in st.session_state:
         st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 במה אני יכול לעזור לך היום?")]
         st.session_state.stage="teacher"
@@ -246,8 +240,8 @@ with tab1:
                 if subs is None: txt+="▪️ אין צורך בחלופה<br>"
                 elif subs: txt+= "▪️ חלופה: " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "<br>"
                 else: txt+="▪️ אין חלופה זמינה<br>"
-            rtl_txt = f'<div class="rtl-block">{txt}</div>'
-            add("bot", rtl_txt)
+            # אין יותר צורך לעטוף ב-div נפרד, כי הקלאס הראשי כבר מטפל בזה
+            add("bot", txt)
         add("bot","שמחתי לעזור! תמיד כאן לשירותך, צמרובוט 🌸")
         st.session_state.stage="done"
     def start_new_search():
