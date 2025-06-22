@@ -19,7 +19,6 @@ section[data-testid="stSidebar"]{display:none;}
 .stSelectbox div[data-baseweb="select"] > div {
     background-color: #d2e1ff; /* צבע רקע כמו של כפתור משתמש */
 }
-/* ### שינוי 1: הוספת קלאס ליישור לימין ### */
 .rtl-block {
     direction: rtl;
     text-align: right;
@@ -115,31 +114,49 @@ def render_chat(container):
 
 chat_container = st.container()
 
+### שינוי: לוגיקה מעודכנת בפונקציית החיפוש ###
 # ───────── substitute fn ─────────
 def find_subs(t,day,start, end):
     rows=df[(df.teacher==t)&(df.day==day)]
     if not rows.empty and (rows.subject==DAY_OFF).all(): return "DAY_OFF"
-    absmap={r.hour:r.subject for _,r in rows.iterrows()}
+    
+    # מפה של שעות העבודה של המורה הנעדרת
+    absent_teacher_schedule = {r.hour:r.subject for _,r in rows.iterrows()}
     out={}
+
     for h in range(start, end + 1):
-        subj=absmap.get(h,'—')
-        
-        if any(keyword in subj for keyword in AVAILABLE_KEYWORDS):
-            out[h]=(subj,None)
+        # בדיקה מה השיעור של המורה הנעדרת בשעה זו
+        subj = absent_teacher_schedule.get(h)
+
+        # מקרה 1: למורה הנעדרת אין שיעור בשעה זו (תא ריק)
+        if subj is None:
+            out[h] = ("לא בבית הספר", None) # None = אין צורך בחלופה
             continue
-        
+
+        # מקרה 2: למורה הנעדרת יש שיעור שלא דורש החלפה
+        if any(keyword in subj for keyword in AVAILABLE_KEYWORDS):
+            out[h] = (subj, None) # None = אין צורך בחלופה
+            continue
+
+        # מקרה 3: המורה הנעדרת מלמדת שיעור רגיל, צריך למצוא חלופה
         opts=[]
         for cand in TEACHERS:
-            if cand==t: continue
-            rec=df[(df.teacher==cand)&(df.day==day)&(df.hour==h)]
-            if rec.empty: continue
+            if cand == t: continue
             
-            stat=rec.iloc[0].subject
+            # בדיקה מה המורה המועמדת עושה בשעה זו
+            rec = df[(df.teacher==cand)&(df.day==day)&(df.hour==h)]
+            
+            # אם אין רשומה, המורה המועמדת לא בבית הספר ולא יכולה להחליף
+            if rec.empty:
+                continue
+            
+            stat = rec.iloc[0].subject
+            # בדיקה אם המורה המועמדת פנויה (כלומר, השיעור שלה מכיל אחת ממילות המפתח)
             for keyword in AVAILABLE_KEYWORDS:
                 if keyword in stat:
                     priority = PRIORITY.get(keyword, 99)
                     opts.append((priority, cand, stat))
-                    break
+                    break # מצאנו, עבור למורה המועמדת הבאה
         
         opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
         out[h]=(subj,opts)
@@ -205,7 +222,6 @@ def calculate():
             elif subs: txt+= "▪️ חלופה: " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "<br>"
             else: txt+="▪️ אין חלופה זמינה<br>"
         
-        ### שינוי 2: עטיפת הטקסט ב-div עם הקלאס החדש ###
         rtl_txt = f'<div class="rtl-block">{txt}</div>'
         add("bot", rtl_txt)
 
