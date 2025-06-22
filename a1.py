@@ -5,6 +5,7 @@ from pathlib import Path
 import streamlit.components.v1 as components
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import re # נוסיף את ספריית הביטויים הרגולריים לניקוי טקסט
 
 # ───────── הגדרות בסיס + CSS ─────────
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
@@ -22,6 +23,7 @@ section[data-testid="stSidebar"]{display:none;}
 """, unsafe_allow_html=True)
 
 # ───────── אייקון קבוע ─────────
+# (הקוד נשאר זהה)
 if Path("bot_calendar.png").exists():
     c1,c2=st.columns([1,9])
     with c1: st.image("bot_calendar.png",width=60)
@@ -32,9 +34,11 @@ else:
 # ───────── נתונים וקבועים ─────────
 DAYS=['יום א','יום ב','יום ג','יום ד','יום ה','יום ו']
 DAY_OFF='יום חופשי'
+# נרחיב את רשימת המקצועות שלא דורשים החלפה
+NO_SUB_NEEDED = ['פרטני', DAY_OFF, 'שהייה', 'הדרכה', 'תגבור', 'שילוב']
 PRIORITY={'שהייה':1,'פרטני':2}
 
-### שינוי מרכזי: פונקציה לקריאה ועיבוד הנתונים מגוגל שיטס ###
+### שינוי מרכזי: פונקציה מתוקנת לקריאה ועיבוד הנתונים מגוגל שיטס ###
 @st.cache_data(ttl=600) # שמירה בזיכרון המטמון ל-10 דקות
 def load_data_from_gsheet():
     try:
@@ -46,60 +50,65 @@ def load_data_from_gsheet():
         worksheet = spreadsheet.worksheet("גיליון1")
         
         data = worksheet.get_all_values()
-    except gspread.exceptions.SpreadsheetNotFound:
-        st.error("שגיאה: לא נמצא קובץ גוגל שיטס בשם 'מורים'. ודא שהשם נכון ושיתפת את הקובץ עם המייל של הבוט.")
-        return pd.DataFrame()
-    except gspread.exceptions.WorksheetNotFound:
-        st.error("שגיאה: לא נמצא גיליון בשם 'גיליון1' בתוך הקובץ. ודא שהשם נכון.")
-        return pd.DataFrame()
     except Exception as e:
-        st.error(f"שגיאה כללית בהתחברות לגוגל שיטס: {e}")
+        st.error(f"שגיאה בהתחברות לגוגל שיטס: {e}. ודא שהשמות נכונים ושיתפת את הקובץ.")
         return pd.DataFrame()
 
     all_records = []
     current_teacher = None
-    header_row = []
-    
+    header_map = {} # מילון שימפה שם יום לאינדקס עמודה
+
     for row in data:
-        if not any(row): continue # דילוג על שורות ריקות
+        if not any(cell.strip() for cell in row): continue # דילוג על שורות ריקות לחלוטין
 
-        if row[0].startswith("מערכת שעות למורה"):
+        # זיהוי שורת כותרת של מורה חדש
+        if "מערכת שעות למורה" in row[0]:
             current_teacher = row[0].replace("מערכת שעות למורה", "").strip()
+            header_map = {} # איפוס מפת הכותרות עבור המורה החדש
             continue
 
-        if row[0] == 'שעה' and current_teacher:
-            header_row = [h.strip() for h in row]
+        # זיהוי שורת הכותרת של הימים (מתחילה ב"שעה")
+        if row and row[0].strip() == 'שעה' and current_teacher:
+            # יצירת מפה של שם היום לאינדקס העמודה שלו
+            header_map = {day_name.strip(): i for i, day_name in enumerate(row) if day_name.strip() in DAYS}
             continue
 
-        if row[0].isdigit() and current_teacher and header_row:
+        # זיהוי שורת נתונים (תא ראשון הוא מספר)
+        if row and row[0].isdigit() and current_teacher and header_map:
             hour = int(row[0])
-            for i, day_header in enumerate(header_row):
-                if day_header in DAYS:
-                    if i < len(row) and row[i]:
-                        subject = row[i].replace('\n', ' ').strip()
-                        
-                        if '.' in subject:
-                            subject = subject.split('.')[0]
+            # לולאה על הימים שמצאנו בכותרת
+            for day_name, col_index in header_map.items():
+                if col_index < len(row) and row[col_index].strip():
+                    # ניקוי שם המקצוע: הסרת ירידות שורה והסרת שם הכיתה
+                    raw_subject = row[col_index].strip()
+                    # שימוש בביטוי רגולרי להסרת שם הכיתה (למשל, " א1")
+                    clean_subject = re.sub(r'\s+[א-ו]\d?$', '', raw_subject.replace('\n', ' ')).strip()
+                    
+                    # טיפול בערכים עם נקודה, כמו 'שהייה.מליאה'
+                    if '.' in clean_subject:
+                        clean_subject = clean_subject.split('.')[0]
 
-                        record = {
-                            'teacher': current_teacher,
-                            'day': day_header,
-                            'hour': hour,
-                            'subject': subject
-                        }
-                        all_records.append(record)
+                    record = {
+                        'teacher': current_teacher,
+                        'day': day_name,
+                        'hour': hour,
+                        'subject': clean_subject
+                    }
+                    all_records.append(record)
 
     df = pd.DataFrame(all_records)
     if df.empty:
-        st.warning("לא נמצאו נתונים בפורמט הצפוי בגוגל שיטס.")
+        st.warning("לא נמצאו נתונים בפורמט הצפוי בגוגל שיטס. בדוק את מבנה הקובץ.")
     return df
+
+# --- שאר הקוד נשאר זהה ---
 
 # טעינת הנתונים
 df = load_data_from_gsheet()
 if not df.empty:
     TEACHERS = sorted(df['teacher'].unique())
 else:
-    TEACHERS = [] # אם יש שגיאה, הרשימה תהיה ריקה
+    TEACHERS = []
 
 # ───────── init state ─────────
 if "chat" not in st.session_state:
@@ -127,14 +136,20 @@ def find_subs(t,day,start, end):
     out={}
     for h in range(start, end + 1):
         subj=absmap.get(h,'—')
-        if subj in ('פרטני', DAY_OFF, 'שהייה', 'הדרכה', 'תגבור'): out[h]=(subj,None); continue
+        # שימוש ברשימה המורחבת של מקצועות ללא צורך בהחלפה
+        if any(keyword in subj for keyword in NO_SUB_NEEDED):
+            out[h]=(subj,None)
+            continue
+        
         opts=[]
         for cand in TEACHERS:
             if cand==t: continue
             rec=df[(df.teacher==cand)&(df.day==day)&(df.hour==h)]
             if rec.empty: continue
             stat=rec.iloc[0].subject
-            if stat in PRIORITY: opts.append((PRIORITY.get(stat, 99),cand,stat))
+            if any(keyword in stat for keyword in NO_SUB_NEEDED):
+                priority = PRIORITY.get(stat.split('.')[0], 99)
+                opts.append((priority, cand, stat))
         opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
         out[h]=(subj,opts)
     return out
@@ -164,7 +179,7 @@ def choose_scope():
     add("user", sc)
     if sc=="יום שלם":
         st.session_state.start=1
-        st.session_state.end=9 # ניתן להתאים למספר השעות המקסימלי
+        st.session_state.end=9
         calculate()
     elif sc=="בטווח שעות":
         st.session_state.stage="hour"
