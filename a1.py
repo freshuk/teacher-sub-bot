@@ -139,22 +139,21 @@ def calculate():
             else: txt+="▪️ אין חלופה זמינה\n"
         add("bot",txt)
     add("bot","שמחתי לעזור! תמיד כאן לשירותך, צמרובוט 🌸")
-    ### שיפור 2: מעבר למצב סיום במקום איפוס מיידי ###
     st.session_state.stage="done"
 
 def start_new_search():
-    ### שיפור 2: פונקציה להתחלת חיפוש חדש ###
     st.session_state.stage="teacher"
-    add("bot", "במה עוד אוכל לעזור?")
+    ### שינוי: הודעה ברורה יותר להתחלת חיפוש חדש ###
+    add("bot", "בטח, נתחיל מחדש. איזו מורה נעדרת הפעם?")
 
-### שיפור 3: פונקציות נפרדות להצגת הווידג'טים ###
+# ───────── פונקציות להצגת הווידג'טים ─────────
 def display_teacher_selection():
     st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher,
-                 label_visibility="collapsed") ### שיפור 1 ###
+                 label_visibility="collapsed")
 
 def display_day_selection():
     st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day,
-                 label_visibility="collapsed") ### שיפור 1 ###
+                 label_visibility="collapsed")
 
 def display_scope_selection():
     st.radio("",("יום שלם","מ-שעה"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
@@ -162,13 +161,13 @@ def display_scope_selection():
 def display_hour_selection():
     add("bot", "בחרי שעת התחלה (1-6):")
     st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,7)], key="sel_hr",on_change=choose_hour,
-                 label_visibility="collapsed") ### שיפור 1 ###
+                 label_visibility="collapsed")
 
 def display_done_state():
-    st.button("🔎 חיפוש חדש", on_click=start_new_search) ### שיפור 2 ###
+    st.button("🔎 חיפוש חדש", on_click=start_new_search)
 
 
-# ───────── dynamic widgets (Main Logic) ─────────
+# ───────── לוגיקה ראשית להצגת הווידג'טים ─────────
 stage = st.session_state.get('stage', 'teacher')
 
 if stage =="teacher":
