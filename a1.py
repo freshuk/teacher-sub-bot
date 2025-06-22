@@ -12,7 +12,7 @@ import base64
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-/* ... (CSS נשאר כמעט זהה) ... */
+/* ... (כל ה-CSS נשאר זהה) ... */
 .main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
 .main-header img { width: 80px !important; margin-bottom: 0.5rem; }
 .main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
@@ -92,7 +92,7 @@ if not df.empty:
 else:
     TEACHERS = []
 
-### שינוי: החלפת st.tabs ב-st.radio לניהול מצב נכון ###
+# ───────── ניווט טאבים ─────────
 tab_names = ["🤖 מצא מחליף", "📅 צפה במערכת"]
 active_tab = st.radio(
     "ניווט", tab_names,
@@ -109,17 +109,21 @@ if active_tab == tab_names[0]:
         st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 במה אני יכול לעזור לך היום?")]
         st.session_state.stage="teacher"
     
+    ### שינוי: פונקציית גלילה מתוקנת ###
     def scroll_to_bottom():
         components.html("""
             <script>
-                window.parent.document.body.scrollTop = window.parent.document.body.scrollHeight;
+                // This script waits a very small amount of time to let the page render, then scrolls
+                setTimeout(function() {
+                    window.parent.document.body.scrollTop = window.parent.document.body.scrollHeight;
+                }, 100);
             </script>
         """, height=0)
 
     def add(role,msg):
         if not st.session_state.chat or st.session_state.chat[-1]!=(role,msg):
             st.session_state.chat.append((role,msg))
-            scroll_to_bottom()
+            # אין צורך לקרוא לגלילה כאן, היא תקרה בסוף ה-rerun
 
     def render_chat(container):
         with container:
@@ -253,12 +257,13 @@ if active_tab == tab_names[0]:
     render_chat(chat_container)
     st.divider()
     if st.button("🗑️ נקה מסך"):
-        keys_to_keep = ['active_tab_radio'] # שמירה על מצב הטאבים
+        keys_to_keep = ['active_tab_radio']
         for key in list(st.session_state.keys()):
             if key not in keys_to_keep:
                 del st.session_state[key]
         st.rerun()
     
+    # קריאה לגלילה בסוף הלוגיקה של הטאב
     scroll_to_bottom()
 
 # ──────────────────────────────────────────────────────────
