@@ -109,21 +109,9 @@ if active_tab == tab_names[0]:
         st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 במה אני יכול לעזור לך היום?")]
         st.session_state.stage="teacher"
     
-    ### שינוי: פונקציית גלילה מתוקנת ###
-    def scroll_to_bottom():
-        components.html("""
-            <script>
-                // This script waits a very small amount of time to let the page render, then scrolls
-                setTimeout(function() {
-                    window.parent.document.body.scrollTop = window.parent.document.body.scrollHeight;
-                }, 100);
-            </script>
-        """, height=0)
-
     def add(role,msg):
         if not st.session_state.chat or st.session_state.chat[-1]!=(role,msg):
             st.session_state.chat.append((role,msg))
-            # אין צורך לקרוא לגלילה כאן, היא תקרה בסוף ה-rerun
 
     def render_chat(container):
         with container:
@@ -263,8 +251,22 @@ if active_tab == tab_names[0]:
                 del st.session_state[key]
         st.rerun()
     
-    # קריאה לגלילה בסוף הלוגיקה של הטאב
-    scroll_to_bottom()
+    ### שינוי: קריאה לגלילה אוטומטית בסוף הטאב ###
+    components.html(
+        """
+        <div id="end-of-chat-anchor" style="height: 1px; margin-top: -1px;"></div>
+        <script>
+            // Small delay to allow the DOM to update
+            setTimeout(function() {
+                var anchor = window.parent.document.getElementById("end-of-chat-anchor");
+                if (anchor) {
+                    anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }
+            }, 250); // Increased delay for more reliability
+        </script>
+        """,
+        height=0,
+    )
 
 # ──────────────────────────────────────────────────────────
 # ─────────── לוגיקה עבור הטאב השני ──────────────
