@@ -12,12 +12,18 @@ st.set_page_config(page_title="צמרובוט – העוזר האישי שלי",
 st.markdown("""
 <style>
 h1{font-size:1.8rem;font-weight:800;margin-bottom:0.4rem;display:inline;}
-.chat-msg{background:#f5f8ff;border-radius:14px;padding:0.7rem 1rem;margin:0.3rem 0;}
+.chat-msg{
+    background:#f5f8ff;
+    border-radius:14px;
+    padding:0.7rem 1rem;
+    margin:0.3rem 0;
+    color: #31333F; /* ### שינוי: הוספת צבע טקסט מפורש ### */
+}
 .chat-user{background:#d2e1ff;}
 button,select,input,label{font-size:1rem;}
 section[data-testid="stSidebar"]{display:none;}
 .stSelectbox div[data-baseweb="select"] > div {
-    background-color: #d2e1ff; /* צבע רקע כמו של כפתור משתמש */
+    background-color: #d2e1ff;
 }
 .rtl-block {
     direction: rtl;
@@ -114,49 +120,40 @@ def render_chat(container):
 
 chat_container = st.container()
 
-### שינוי: לוגיקה מעודכנת בפונקציית החיפוש ###
 # ───────── substitute fn ─────────
 def find_subs(t,day,start, end):
     rows=df[(df.teacher==t)&(df.day==day)]
     if not rows.empty and (rows.subject==DAY_OFF).all(): return "DAY_OFF"
     
-    # מפה של שעות העבודה של המורה הנעדרת
     absent_teacher_schedule = {r.hour:r.subject for _,r in rows.iterrows()}
     out={}
 
     for h in range(start, end + 1):
-        # בדיקה מה השיעור של המורה הנעדרת בשעה זו
         subj = absent_teacher_schedule.get(h)
 
-        # מקרה 1: למורה הנעדרת אין שיעור בשעה זו (תא ריק)
         if subj is None:
-            out[h] = ("לא בבית הספר", None) # None = אין צורך בחלופה
+            out[h] = ("לא בבית הספר", None)
             continue
 
-        # מקרה 2: למורה הנעדרת יש שיעור שלא דורש החלפה
         if any(keyword in subj for keyword in AVAILABLE_KEYWORDS):
-            out[h] = (subj, None) # None = אין צורך בחלופה
+            out[h] = (subj, None)
             continue
 
-        # מקרה 3: המורה הנעדרת מלמדת שיעור רגיל, צריך למצוא חלופה
         opts=[]
         for cand in TEACHERS:
             if cand == t: continue
             
-            # בדיקה מה המורה המועמדת עושה בשעה זו
             rec = df[(df.teacher==cand)&(df.day==day)&(df.hour==h)]
             
-            # אם אין רשומה, המורה המועמדת לא בבית הספר ולא יכולה להחליף
             if rec.empty:
                 continue
             
             stat = rec.iloc[0].subject
-            # בדיקה אם המורה המועמדת פנויה (כלומר, השיעור שלה מכיל אחת ממילות המפתח)
             for keyword in AVAILABLE_KEYWORDS:
                 if keyword in stat:
                     priority = PRIORITY.get(keyword, 99)
                     opts.append((priority, cand, stat))
-                    break # מצאנו, עבור למורה המועמדת הבאה
+                    break
         
         opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
         out[h]=(subj,opts)
