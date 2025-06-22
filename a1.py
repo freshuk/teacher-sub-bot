@@ -12,52 +12,15 @@ import base64
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-/* General Styles */
-button, select, input, label {font-size:1rem;}
-section[data-testid="stSidebar"] {display:none;}
-
-/* Header Styles */
-.main-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    margin-bottom: 1rem;
-}
-.main-header img {
-    width: 80px !important;
-    margin-bottom: 0.5rem;
-}
-.main-header h3 {
-    font-size: 1.8rem;
-    font-weight: 800;
-    text-align: center;
-    width: 100%;
-}
-
-/* Chat Bubble Styles */
-.chat-msg {
-    background:#f5f8ff;
-    border-radius:14px;
-    padding:0.7rem 1rem;
-    margin:0.3rem 0;
-    color: #31333F;
-    /* ### שינוי מרכזי: החלת RTL על כל בועות הצ'אט ### */
-    direction: rtl;
-    text-align: right;
-}
+/* ... (כל ה-CSS נשאר זהה) ... */
+.main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
+.main-header img { width: 80px !important; margin-bottom: 0.5rem; }
+.main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
+.chat-msg { background:#f5f8ff; border-radius:14px; padding:0.7rem 1rem; margin:0.3rem 0; color: #31333F; direction: rtl; text-align: right; }
 .chat-user {background:#d2e1ff;}
 .stSelectbox div[data-baseweb="select"] > div {background-color: #d2e1ff;}
-
-/* RTL Widgets Alignment */
-div[data-testid="stRadio"] > div {
-    flex-direction: row-reverse;
-    justify-content: flex-start;
-}
-div[data-testid="stRadio"] label {
-    margin-left: 0.5rem !important;
-    margin-right: 0 !important;
-}
+div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
+div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -77,7 +40,6 @@ if img_base64:
     """, unsafe_allow_html=True)
 else:
     st.markdown('<div class="main-header"><h3>🤖 צמרובוט – העוזר האישי שלי</h3></div>', unsafe_allow_html=True)
-
 
 # ───────── נתונים וקבועים ─────────
 DAYS=['יום א','יום ב','יום ג','יום ד','יום ה','יום ו']
@@ -105,34 +67,23 @@ def load_data_from_gsheet():
 
     for row in data:
         if not any(cell.strip() for cell in row): continue
-
         if "מערכת שעות למורה" in row[0]:
             current_teacher = row[0].replace("מערכת שעות למורה", "").strip()
             header_map = {}
             continue
-
         if row and row[0].strip() == 'שעה' and current_teacher:
             header_map = {day_name.strip(): i for i, day_name in enumerate(row) if day_name.strip() in DAYS}
             continue
-
         if row and row[0].isdigit() and current_teacher and header_map:
             hour = int(row[0])
             for day_name, col_index in header_map.items():
                 if col_index < len(row) and row[col_index].strip():
                     raw_subject = row[col_index].strip()
                     clean_subject = re.sub(r'\s+[א-ו]\d?$', '', raw_subject.replace('\n', ' ')).strip()
-                    
-                    record = {
-                        'teacher': current_teacher,
-                        'day': day_name,
-                        'hour': hour,
-                        'subject': clean_subject
-                    }
+                    record = {'teacher': current_teacher, 'day': day_name, 'hour': hour, 'subject': clean_subject}
                     all_records.append(record)
-
     df = pd.DataFrame(all_records)
-    if df.empty:
-        st.warning("לא נמצאו נתונים בפורמט הצפוי בגוגל שיטס. בדוק את מבנה הקובץ.")
+    if df.empty: st.warning("לא נמצאו נתונים בפורמט הצפוי בגוגל שיטס.")
     return df
 
 df = load_data_from_gsheet()
@@ -141,8 +92,16 @@ if not df.empty:
 else:
     TEACHERS = []
 
-### שינוי מבני: יצירת טאבים ###
-tab1, tab2 = st.tabs(["🤖 מצא מחליף", "📅 צפה במערכת"])
+### שינוי 2: לוגיקה לזכירת הטאב הפעיל ###
+def on_tab_change():
+    st.session_state.active_tab = st.session_state.tabs_key
+
+tab_names = ["🤖 מצא מחליף", "📅 צפה במערכת"]
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = tab_names[0]
+
+tab1, tab2 = st.tabs(tab_names, key='tabs_key', on_change=on_tab_change)
+
 
 # ──────────────────────────────────────────────────────────
 # ─────────── טאב 1: מצא מחליף (הקוד הקיים) ──────────────
@@ -151,16 +110,30 @@ with tab1:
     if "chat" not in st.session_state:
         st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 במה אני יכול לעזור לך היום?")]
         st.session_state.stage="teacher"
+    
+    ### שינוי 1: פונקציית גלילה ###
+    def scroll_to_bottom():
+        components.html("""
+            <script>
+                window.parent.document.body.scrollTop = window.parent.document.body.scrollHeight;
+            </script>
+        """, height=0)
+
     def add(role,msg):
         if not st.session_state.chat or st.session_state.chat[-1]!=(role,msg):
             st.session_state.chat.append((role,msg))
+            scroll_to_bottom() # קריאה לגלילה אחרי כל הוספת הודעה
+
     def render_chat(container):
         with container:
             for r,m in st.session_state.chat:
                 cls="chat-msg chat-user" if r=="user" else "chat-msg"
                 st.markdown(f"<div class='{cls}'>{m}</div>",unsafe_allow_html=True)
+    
     chat_container = st.container()
+
     def find_subs(t,day,start, end):
+        # ... (הפונקציה נשארת זהה)
         rows=df[(df.teacher==t)&(df.day==day)]
         if not rows.empty and (rows.subject==DAY_OFF).all(): return "DAY_OFF"
         absent_teacher_schedule = {r.hour:r.subject for _,r in rows.iterrows()}
@@ -187,6 +160,7 @@ with tab1:
             opts.sort(key=lambda x:(x[0],TEACHERS.index(x[1])))
             out[h]=(subj,opts)
         return out
+
     def choose_teacher():
         t=st.session_state.sel_teacher
         if t:
@@ -195,6 +169,7 @@ with tab1:
             st.session_state.stage="day"
             add("bot",f"מעולה, בחרנו במורה **{t}**.\nלאיזה יום היא נעדרת?")
             st.session_state.sel_teacher=""
+
     def choose_day():
         d=st.session_state.sel_day
         if d:
@@ -203,6 +178,7 @@ with tab1:
             st.session_state.stage="scope"
             add("bot","היא נעדרת **יום שלם** או **בטווח שעות**?")
             st.session_state.sel_day=""
+
     def choose_scope():
         sc=st.session_state.sel_scope
         if not sc: return
@@ -213,6 +189,7 @@ with tab1:
             calculate()
         elif sc=="בטווח שעות":
             st.session_state.stage="hour"
+
     def choose_hour():
         hr=st.session_state.sel_hr
         if hr:
@@ -220,6 +197,7 @@ with tab1:
             st.session_state.start=int(hr)
             st.session_state.stage="end_hour"
             st.session_state.sel_hr=""
+
     def choose_end_hour():
         end_hr = st.session_state.sel_end_hr
         if end_hr:
@@ -227,6 +205,7 @@ with tab1:
             st.session_state.end = int(end_hr)
             st.session_state.sel_end_hr = ""
             calculate()
+
     def calculate():
         with st.spinner("צמרובוט חושב…"): time.sleep(1.1)
         res=find_subs(st.session_state.teacher,st.session_state.day,st.session_state.start, st.session_state.end)
@@ -240,36 +219,32 @@ with tab1:
                 if subs is None: txt+="▪️ אין צורך בחלופה<br>"
                 elif subs: txt+= "▪️ חלופה: " + " / ".join(f"{t} ({s})" for _, t, s in subs) + "<br>"
                 else: txt+="▪️ אין חלופה זמינה<br>"
-            # אין יותר צורך לעטוף ב-div נפרד, כי הקלאס הראשי כבר מטפל בזה
             add("bot", txt)
         add("bot","שמחתי לעזור! תמיד כאן לשירותך, צמרובוט 🌸")
         st.session_state.stage="done"
+
     def start_new_search():
         st.session_state.stage="teacher"
         add("bot", "בטח, נתחיל מחדש. איזו מורה נעדרת הפעם?")
+
     def display_teacher_selection():
-        if not TEACHERS:
-            st.warning("לא נטענו מורים. בדוק את החיבור לגוגל שיטס ואת מבנה הקובץ.")
-            return
-        st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher,
-                     label_visibility="collapsed")
+        if not TEACHERS: return
+        st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher, label_visibility="collapsed")
     def display_day_selection():
-        st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day,
-                     label_visibility="collapsed")
+        st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day, label_visibility="collapsed")
     def display_scope_selection():
         st.radio("",("יום שלם","בטווח שעות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
     def display_hour_selection():
         add("bot", "בחרי שעת התחלה (1-9):")
-        st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,10)], key="sel_hr",on_change=choose_hour,
-                     label_visibility="collapsed")
+        st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,10)], key="sel_hr",on_change=choose_hour, label_visibility="collapsed")
     def display_end_hour_selection():
         add("bot", "עד איזו שעה?")
         start_hour = st.session_state.get('start', 1)
         options = [str(i) for i in range(start_hour, 10)]
-        st.selectbox("שעת סיום:", [""] + options, key="sel_end_hr", on_change=choose_end_hour,
-                     label_visibility="collapsed")
+        st.selectbox("שעת סיום:", [""] + options, key="sel_end_hr", on_change=choose_end_hour, label_visibility="collapsed")
     def display_done_state():
         st.button("🔎 חיפוש חדש", on_click=start_new_search)
+    
     stage = st.session_state.get('stage', 'teacher')
     if stage =="teacher": display_teacher_selection()
     elif stage =="day": display_day_selection()
@@ -277,10 +252,11 @@ with tab1:
     elif stage == "hour": display_hour_selection()
     elif stage == "end_hour": display_end_hour_selection()
     elif stage == "done": display_done_state()
+    
     render_chat(chat_container)
     st.divider()
     if st.button("🗑️ נקה מסך"):
-        keys_to_keep = []
+        keys_to_keep = ['active_tab', 'tabs_key'] # שמירה על מצב הטאבים
         for key in list(st.session_state.keys()):
             if key not in keys_to_keep:
                 del st.session_state[key]
@@ -309,15 +285,10 @@ with tab2:
                 st.write("לא נמצאה מערכת שעות עבור מורה זו.")
             else:
                 schedule_pivot = teacher_df.pivot_table(
-                    index='hour',
-                    columns='day',
-                    values='subject',
-                    aggfunc='first'
+                    index='hour', columns='day', values='subject', aggfunc='first'
                 )
-                
                 all_hours = pd.Index(range(1, 10), name='hour')
                 schedule_pivot = schedule_pivot.reindex(all_hours).fillna('')
-
                 ordered_days = [day for day in DAYS if day in schedule_pivot.columns]
                 schedule_pivot = schedule_pivot[ordered_days]
                 schedule_pivot.index.name = "שעה"
@@ -327,10 +298,13 @@ with tab2:
                         return 'background-color: #e6ffed'
                     elif val == '':
                         return 'background-color: #f0f2f6'
-                    else:
-                        return ''
+                    return ''
 
                 st.dataframe(
                     schedule_pivot.style.apply(lambda x: x.map(color_schedule)),
                     use_container_width=True
                 )
+
+# הגלילה תתבצע רק בטאב של הצ'אט, אין צורך בה בסוף
+if st.session_state.active_tab == tab_names[0]:
+    scroll_to_bottom()
