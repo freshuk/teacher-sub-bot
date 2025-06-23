@@ -23,10 +23,11 @@ div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content:
 div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
 
 /* ### שינוי: הפתרון הסופי והאמין לגלילה במובייל ### */
-[data-baseweb="popover"] ul[role="listbox"] {
-    max-height: 300px !important; /* כפיית הגובה המקסימלי */
-    overflow-y: auto !important;  /* כפיית הגלילה האנכית */
-    -webkit-overflow-scrolling: touch; /* חיוני לגלילה חלקה במכשירי מגע (iOS) */
+/* This targets the listbox inside the popover */
+[data-baseweb="popover"] [role="listbox"] {
+    max-height: 300px !important;
+    overflow-y: scroll !important; /* Use 'scroll' to be more forceful than 'auto' */
+    -webkit-overflow-scrolling: touch !important; /* Crucial for iOS */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -113,7 +114,6 @@ active_tab = st.radio(
 # ──────────────────────────────────────────────────────────
 if active_tab == tab_names[0]:
     if "chat" not in st.session_state:
-        ### שינוי: עדכון הודעת הפתיחה ###
         st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 אשמח לעזור לך! בבקשה תבחרי את שם המורה הנעדר\\ת ונמשיך משם.")]
         st.session_state.stage="teacher"
     
