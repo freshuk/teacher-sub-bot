@@ -22,10 +22,18 @@ st.markdown("""
 div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
 div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
 
-/* ### שינוי: תיקון גלילה ברשימה נפתחת במובייל עם !important ### */
-[data-baseweb="popover"] ul[role="listbox"] {
-    max-height: 300px !important; /* כפיית הגובה המקסימלי */
-    overflow-y: auto !important;  /* כפיית הגלילה האנכית */
+/* ### שינוי: הפתרון הסופי לגלילה במובייל ### */
+/* This targets the floating popover that contains the list */
+[data-baseweb="popover"] {
+    max-height: 300px !important;
+}
+
+/* This targets the direct child of the popover which holds the list */
+[data-baseweb="popover"] > div {
+    max-height: 300px !important;
+    overflow-y: auto !important;
+    /* This property is crucial for enabling smooth scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
 }
 </style>
 """, unsafe_allow_html=True)
