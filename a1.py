@@ -12,7 +12,7 @@ import base64
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-/* ... (כל ה-CSS נשאר זהה) ... */
+/* ... (כל ה-CSS הקיים נשאר זהה) ... */
 .main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
 .main-header img { width: 80px !important; margin-bottom: 0.5rem; }
 .main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
@@ -21,6 +21,12 @@ st.markdown("""
 .stSelectbox div[data-baseweb="select"] > div {background-color: #d2e1ff;}
 div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
 div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
+
+/* ### שינוי: תיקון גלילה ברשימה נפתחת במובייל ### */
+[data-baseweb="popover"] ul[role="listbox"] {
+    max-height: 300px; /* הגבלת הגובה המקסימלי של הרשימה */
+    overflow-y: auto;  /* הוספת גלילה אנכית אוטומטית כשהתוכן חורג */
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -106,7 +112,7 @@ active_tab = st.radio(
 # ──────────────────────────────────────────────────────────
 if active_tab == tab_names[0]:
     if "chat" not in st.session_state:
-        st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 במה אני יכול לעזור לך היום?")]
+        st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 אשמח לעזור לך! בבקשה תבחרי את שם המורה הנעדר\ת ונמשיך משם.")]
         st.session_state.stage="teacher"
     
     def add(role,msg):
@@ -251,16 +257,12 @@ if active_tab == tab_names[0]:
                 del st.session_state[key]
         st.rerun()
     
-    ### שינוי: קריאה לגלילה אוטומטית בסוף הטאב ###
-    # This is the "Anchor Hack" for reliable auto-scrolling
     st.markdown('<div id="end-of-chat-anchor" style="height: 0px;"></div>', unsafe_allow_html=True)
     components.html(
         """
         <script>
-            // We target the anchor element within the parent document
             const anchor = window.parent.document.getElementById("end-of-chat-anchor");
             if (anchor) {
-                // The timeout is crucial to wait for the DOM to be updated.
                 setTimeout(() => {
                     anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }, 250);
