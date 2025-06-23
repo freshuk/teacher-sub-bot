@@ -22,10 +22,10 @@ st.markdown("""
 div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
 div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
 
-/* ### שינוי: תיקון גלילה ברשימה נפתחת במובייל ### */
+/* ### שינוי: תיקון גלילה ברשימה נפתחת במובייל עם !important ### */
 [data-baseweb="popover"] ul[role="listbox"] {
-    max-height: 300px; /* הגבלת הגובה המקסימלי של הרשימה */
-    overflow-y: auto;  /* הוספת גלילה אנכית אוטומטית כשהתוכן חורג */
+    max-height: 300px !important; /* כפיית הגובה המקסימלי */
+    overflow-y: auto !important;  /* כפיית הגלילה האנכית */
 }
 </style>
 """, unsafe_allow_html=True)
