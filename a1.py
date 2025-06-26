@@ -12,7 +12,7 @@ import base64
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-/* ... (CSS is now much simpler as we removed the problematic fixes) ... */
+/* ... (כל ה-CSS הקיים נשאר זהה) ... */
 .main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
 .main-header img { width: 80px !important; margin-bottom: 0.5rem; }
 .main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
@@ -21,6 +21,7 @@ st.markdown("""
 .stSelectbox div[data-baseweb="select"] > div {background-color: #d2e1ff;}
 div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
 div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
+[data-baseweb="popover"] [role="listbox"] { max-height: 300px !important; overflow-y: scroll !important; -webkit-overflow-scrolling: touch !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -106,7 +107,7 @@ active_tab = st.radio(
 # ──────────────────────────────────────────────────────────
 if active_tab == tab_names[0]:
     if "chat" not in st.session_state:
-        st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 אשמח לעזור לך! בבקשה הקלידי את שם המורה הנעדר\\ת ונמשיך משם.")]
+        st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 אשמח לעזור לך! בבקשה תבחרי את שם המורה הנעדר\\ת ונמשיך משם.")]
         st.session_state.stage="teacher"
     
     def add(role,msg):
@@ -121,13 +122,15 @@ if active_tab == tab_names[0]:
     
     chat_container = st.container()
 
-    def find_subs(t,day,start, end):
-        # ... (הפונקציה נשארת זהה)
+    ### שינוי: הפונקציה מקבלת כעת רשימת שעות ###
+    def find_subs(t, day, hours_list):
         rows=df[(df.teacher==t)&(df.day==day)]
         if not rows.empty and (rows.subject==DAY_OFF).all(): return "DAY_OFF"
+        
         absent_teacher_schedule = {r.hour:r.subject for _,r in rows.iterrows()}
         out={}
-        for h in range(start, end + 1):
+
+        for h in hours_list:
             subj = absent_teacher_schedule.get(h)
             if subj is None:
                 out[h] = ("לא בבית הספר", None)
@@ -150,13 +153,14 @@ if active_tab == tab_names[0]:
             out[h]=(subj,opts)
         return out
 
-    ### שינוי: פונקציית קולבק חדשה לבחירת מורה מכפתור ###
-    def select_teacher(teacher_name):
-        add("user", teacher_name)
-        st.session_state.teacher = teacher_name
-        st.session_state.stage = "day"
-        add("bot", f"מעולה, בחרנו במורה **{teacher_name}**.\nלאיזה יום היא נעדרת?")
-        st.session_state.teacher_search = "" # איפוס החיפוש
+    def choose_teacher():
+        t=st.session_state.sel_teacher
+        if t:
+            add("user",t)
+            st.session_state.teacher=t
+            st.session_state.stage="day"
+            add("bot",f"מעולה, בחרנו במורה **{t}**.\nלאיזה יום היא נעדרת?")
+            st.session_state.sel_teacher=""
 
     def choose_day():
         d=st.session_state.sel_day
@@ -164,7 +168,7 @@ if active_tab == tab_names[0]:
             add("user",d)
             st.session_state.day=d
             st.session_state.stage="scope"
-            add("bot","היא נעדרת **יום שלם** או **בטווח שעות**?")
+            add("bot","היא נעדרת **יום שלם** או **בשעות ספציפיות**?")
             st.session_state.sel_day=""
 
     def choose_scope():
@@ -172,36 +176,32 @@ if active_tab == tab_names[0]:
         if not sc: return
         add("user", sc)
         if sc=="יום שלם":
-            st.session_state.start=1
-            st.session_state.end=9
+            st.session_state.selected_hours = list(range(1, 10))
             calculate()
-        elif sc=="בטווח שעות":
-            st.session_state.stage="hour"
+        elif sc=="בשעות ספציפיות":
+            st.session_state.stage="select_hours"
 
-    def choose_hour():
-        hr=st.session_state.sel_hr
-        if hr:
-            add("user",f"משעה {hr}")
-            st.session_state.start=int(hr)
-            st.session_state.stage="end_hour"
-            st.session_state.sel_hr=""
-
-    def choose_end_hour():
-        end_hr = st.session_state.sel_end_hr
-        if end_hr:
-            add("user", f"עד שעה {end_hr}")
-            st.session_state.end = int(end_hr)
-            st.session_state.sel_end_hr = ""
-            calculate()
+    ### שינוי: פונקציית קולבק חדשה לאיסוף השעות שנבחרו ###
+    def process_hour_selection():
+        selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_{h}", False)]
+        if not selected_hours:
+            add("bot", "לא נבחרו שעות. אנא סמני לפחות שעה אחת.")
+            return
+        
+        st.session_state.selected_hours = selected_hours
+        # יצירת הודעה למשתמש על השעות שנבחרו
+        hours_str = ", ".join(map(str, selected_hours))
+        add("user", f"שעות נבחרות: {hours_str}")
+        calculate()
 
     def calculate():
         with st.spinner("צמרובוט חושב…"): time.sleep(1.1)
-        res=find_subs(st.session_state.teacher,st.session_state.day,st.session_state.start, st.session_state.end)
+        res=find_subs(st.session_state.teacher, st.session_state.day, st.session_state.selected_hours)
         if res=="DAY_OFF":
             add("bot",f"✋ **{st.session_state.teacher}** בחופש ביום **{st.session_state.day}** – אין צורך בחלופה.")
         else:
             txt=f"להלן החלופות למורה **{st.session_state.teacher}** ביום **{st.session_state.day}**:<br>"
-            for h in range(st.session_state.start, st.session_state.end + 1):
+            for h in sorted(res.keys()):
                 subj,subs=res.get(h, ('—', []))
                 txt+=f"<br>**🕐 שעה {h}** – {subj}<br>"
                 if subs is None: txt+="▪️ אין צורך בחלופה<br>"
@@ -213,42 +213,31 @@ if active_tab == tab_names[0]:
 
     def start_new_search():
         st.session_state.stage="teacher"
-        add("bot", "בטח, נתחיל מחדש. הקלידי את שם המורה הנעדר\\ת.")
+        add("bot", "בטח, נתחיל מחדש. איזו מורה נעדרת הפעם?")
 
-    ### שינוי: פונקציית תצוגה חדשה עם חיפוש טקסט ###
     def display_teacher_selection():
         if not TEACHERS: return
-        
-        st.text_input(
-            "הקלידי שם מורה כדי לחפש:",
-            key="teacher_search",
-            placeholder="לדוגמה: אביטל"
-        )
-
-        search_term = st.session_state.teacher_search.strip().lower()
-        if search_term:
-            # הצגת עד 5 תוצאות כדי למנוע הצפה של המסך
-            filtered_teachers = [t for t in TEACHERS if search_term in t.lower()][:5]
-            
-            if not filtered_teachers:
-                st.info("לא נמצאו מורים תואמים לחיפוש.")
-            else:
-                for teacher in filtered_teachers:
-                    # שימוש ב-use_container_width כדי שהכפתורים יתפסו את כל הרוחב
-                    st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
-
+        st.selectbox("בחרי מורה חסרה:",[""]+TEACHERS,key="sel_teacher",on_change=choose_teacher, label_visibility="collapsed")
     def display_day_selection():
         st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day, label_visibility="collapsed")
     def display_scope_selection():
-        st.radio("",("יום שלם","בטווח שעות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
+        st.radio("",("יום שלם","בשעות ספציפיות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
+    
+    ### שינוי: פונקציית תצוגה חדשה עם צ'קבוקסים ###
     def display_hour_selection():
-        add("bot", "בחרי שעת התחלה (1-9):")
-        st.selectbox("שעת התחלה:",[""]+[str(i) for i in range(1,10)], key="sel_hr",on_change=choose_hour, label_visibility="collapsed")
-    def display_end_hour_selection():
-        add("bot", "עד איזו שעה?")
-        start_hour = st.session_state.get('start', 1)
-        options = [str(i) for i in range(start_hour, 10)]
-        st.selectbox("שעת סיום:", [""] + options, key="sel_end_hr", on_change=choose_end_hour, label_visibility="collapsed")
+        add("bot", "סמני את השעות שבהן המורה נעדרת ולחצי על 'מצא מחליפים'.")
+        
+        col1, col2 = st.columns(2)
+        for h in range(1, 10):
+            if h <= 5:
+                with col1:
+                    st.checkbox(f"שעה {h}", key=f"hour_{h}")
+            else:
+                with col2:
+                    st.checkbox(f"שעה {h}", key=f"hour_{h}")
+        
+        st.button("מצא מחליפים", on_click=process_hour_selection, use_container_width=True)
+
     def display_done_state():
         st.button("🔎 חיפוש חדש", on_click=start_new_search)
     
@@ -256,8 +245,7 @@ if active_tab == tab_names[0]:
     if stage =="teacher": display_teacher_selection()
     elif stage =="day": display_day_selection()
     elif stage =="scope": display_scope_selection()
-    elif stage == "hour": display_hour_selection()
-    elif stage == "end_hour": display_end_hour_selection()
+    elif stage == "select_hours": display_hour_selection() # שלב חדש
     elif stage == "done": display_done_state()
     
     render_chat(chat_container)
@@ -293,32 +281,14 @@ elif active_tab == tab_names[1]:
     if not TEACHERS:
         st.warning("לא נטענו מורים. בדוק את החיבור לגוגל שיטס ואת מבנה הקובץ.")
     else:
-        # שימוש באותו מנגנון חיפוש גם כאן
-        search_term_sched = st.text_input(
-            "הקלידי שם מורה לצפייה במערכת:",
-            key="schedule_teacher_search",
-            placeholder="לדוגמה: אביטל"
-        ).strip().lower()
+        selected_teacher = st.selectbox(
+            "בחרי מורה לצפייה במערכת:",
+            options=[""] + TEACHERS,
+            key="schedule_teacher_select",
+            label_visibility="collapsed"
+        )
 
-        # שימוש ב-session_state כדי לזכור את המורה הנבחר
-        if 'selected_schedule_teacher' not in st.session_state:
-            st.session_state.selected_schedule_teacher = None
-
-        if search_term_sched:
-            filtered_teachers_sched = [t for t in TEACHERS if search_term_sched in t.lower()][:5]
-            
-            if not filtered_teachers_sched:
-                st.info("לא נמצאו מורים תואמים לחיפוש.")
-            else:
-                for teacher in filtered_teachers_sched:
-                    if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
-                        st.session_state.selected_schedule_teacher = teacher
-        
-        # הצגת המערכת אם נבחר מורה
-        if st.session_state.selected_schedule_teacher:
-            selected_teacher = st.session_state.selected_schedule_teacher
-            st.write(f"**מציג מערכת עבור: {selected_teacher}**")
-            
+        if selected_teacher:
             teacher_df = df[df['teacher'] == selected_teacher]
 
             if teacher_df.empty:
