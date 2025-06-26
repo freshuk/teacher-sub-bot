@@ -181,19 +181,6 @@ if active_tab == tab_names[0]:
         elif sc=="בשעות ספציפיות":
             st.session_state.stage="select_hours"
 
-    ### שינוי: פונקציית קולבק חדשה לאיסוף השעות שנבחרו ###
-    def process_hour_selection():
-        selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_{h}", False)]
-        if not selected_hours:
-            add("bot", "לא נבחרו שעות. אנא סמני לפחות שעה אחת.")
-            return
-        
-        st.session_state.selected_hours = selected_hours
-        # יצירת הודעה למשתמש על השעות שנבחרו
-        hours_str = ", ".join(map(str, selected_hours))
-        add("user", f"שעות נבחרות: {hours_str}")
-        calculate()
-
     def calculate():
         with st.spinner("צמרובוט חושב…"): time.sleep(1.1)
         res=find_subs(st.session_state.teacher, st.session_state.day, st.session_state.selected_hours)
@@ -227,16 +214,24 @@ if active_tab == tab_names[0]:
     def display_hour_selection():
         add("bot", "סמני את השעות שבהן המורה נעדרת ולחצי על 'מצא מחליפים'.")
         
-        col1, col2 = st.columns(2)
-        for h in range(1, 10):
-            if h <= 5:
-                with col1:
+        # שימוש ב-st.form כדי למנוע rerun על כל לחיצה
+        with st.form(key="hours_form"):
+            cols = st.columns(2)
+            for h in range(1, 10):
+                target_col = cols[0] if h <= 5 else cols[1]
+                with target_col:
                     st.checkbox(f"שעה {h}", key=f"hour_{h}")
-            else:
-                with col2:
-                    st.checkbox(f"שעה {h}", key=f"hour_{h}")
-        
-        st.button("מצא מחליפים", on_click=process_hour_selection, use_container_width=True)
+            
+            submitted = st.form_submit_button("מצא מחליפים")
+            if submitted:
+                selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_{h}", False)]
+                if not selected_hours:
+                    st.warning("יש לבחור לפחות שעה אחת.")
+                else:
+                    st.session_state.selected_hours = selected_hours
+                    hours_str = ", ".join(map(str, selected_hours))
+                    add("user", f"שעות נבחרות: {hours_str}")
+                    calculate()
 
     def display_done_state():
         st.button("🔎 חיפוש חדש", on_click=start_new_search)
