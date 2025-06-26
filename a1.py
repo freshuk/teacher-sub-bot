@@ -157,7 +157,7 @@ if active_tab == tab_names[0]:
         st.session_state.teacher = teacher_name
         st.session_state.stage = "day"
         add("bot", f"מעולה, בחרנו במורה **{teacher_name}**.\nלאיזה יום היא נעדרת?")
-        st.session_state.teacher_search = ""
+        st.session_state.teacher_search_chat = ""
 
     def choose_day():
         d=st.session_state.sel_day
@@ -205,19 +205,20 @@ if active_tab == tab_names[0]:
         
         search_term = st.text_input(
             "הקלידי שם מורה כדי לחפש:",
-            key="teacher_search",
+            key="teacher_search_chat",
             placeholder="לדוגמה: אביטל"
         )
 
         search_term = search_term.strip().lower()
         if search_term:
-            filtered_teachers = [t for t in TEACHERS if search_term in t.lower()][:5]
+            filtered_teachers = [t for t in TEACHERS if search_term in t.lower()]
             
-            if not filtered_teachers:
-                st.info("לא נמצאו מורים תואמים לחיפוש.")
-            else:
-                for teacher in filtered_teachers:
-                    st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
+            with st.container(height=300):
+                if not filtered_teachers:
+                    st.info("לא נמצאו מורים תואמים לחיפוש.")
+                else:
+                    for teacher in filtered_teachers:
+                        st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
 
     def display_day_selection():
         st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day, label_visibility="collapsed")
@@ -312,14 +313,15 @@ elif active_tab == tab_names[1]:
             st.session_state.selected_schedule_teacher = None
 
         if search_term_sched:
-            filtered_teachers_sched = [t for t in TEACHERS if search_term_sched in t.lower()][:5]
+            filtered_teachers_sched = [t for t in TEACHERS if search_term_sched in t.lower()]
             
-            if not filtered_teachers_sched:
-                st.info("לא נמצאו מורים תואמים לחיפוש.")
-            else:
-                for teacher in filtered_teachers_sched:
-                    if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
-                        st.session_state.selected_schedule_teacher = teacher
+            with st.container(height=300):
+                if not filtered_teachers_sched:
+                    st.info("לא נמצאו מורים תואמים לחיפוש.")
+                else:
+                    for teacher in filtered_teachers_sched:
+                        if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
+                            st.session_state.selected_schedule_teacher = teacher
         
         if st.session_state.selected_schedule_teacher:
             selected_teacher = st.session_state.selected_schedule_teacher
