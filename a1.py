@@ -10,7 +10,43 @@ import base64
 
 # ───────── הגדרות בסיס + CSS ─────────
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
-st.markdown("""
+
+css_original = """
+<style>
+/* עיצוב מקורי נשמר */
+.main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
+.main-header img { width: 80px !important; margin-bottom: 0.5rem; }
+.main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
+.chat-msg { background:#f5f8ff; border-radius:14px; padding:0.7rem 1rem; margin:0.3rem 0; color: #31333F; direction: rtl; text-align: right; }
+.chat-user {background:#d2e1ff;}
+div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
+div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
+
+/* שיפור: עיצוב חדש ומשופר לבחירת השעות */
+.hour-grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    direction: rtl;
+}
+.hour-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+.hour-card.selected {
+    background-color: #d2e1ff;
+    border-color: #a7c3ff;
+}
+.hour-card span {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+</style>
+"""
 <style>
 /* עיצוב כללי משופר */
 .stApp {
@@ -41,7 +77,11 @@ st.markdown("""
     margin: 0;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
+</style>
+"""
 
+css_chat = """
+<style>
 /* עיצוב הצ'אט */
 .chat-msg { 
     background: white;
@@ -67,7 +107,11 @@ st.markdown("""
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+</style>
+"""
 
+css_tabs = """
+<style>
 /* עיצוב הטאבים */
 div[data-testid="stRadio"] > div { 
     flex-direction: row-reverse; 
@@ -93,7 +137,11 @@ div[data-testid="stRadio"] label[data-selected="true"] {
     color: white;
     border-color: #667eea;
 }
+</style>
+"""
 
+css_hours = """
+<style>
 /* עיצוב משופר לבחירת השעות */
 .hours-selection-container {
     background: white;
@@ -145,7 +193,11 @@ div[data-testid="stRadio"] label[data-selected="true"] {
     border-color: #667eea;
     transform: translateY(-2px);
 }
+</style>
+"""
 
+css_components = """
+<style>
 /* עיצוב כפתורים */
 .stButton > button {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -212,7 +264,14 @@ div[data-testid="stRadio"] label[data-selected="true"] {
     }
 }
 </style>
-""", unsafe_allow_html=True)
+"""
+
+# הוספת כל ה-CSS
+st.markdown(css_general, unsafe_allow_html=True)
+st.markdown(css_chat, unsafe_allow_html=True)
+st.markdown(css_tabs, unsafe_allow_html=True)
+st.markdown(css_hours, unsafe_allow_html=True)
+st.markdown(css_components, unsafe_allow_html=True)
 
 # ───────── אייקון וכותרת ─────────
 def get_image_as_base64(path):
@@ -479,10 +538,14 @@ if active_tab == tab_names[0]:
         """, height=0)
         
         # Hidden buttons to handle checkbox changes
-        for h in range(1, 10):
-            if st.button(f"Toggle {h}", key=f"hour_btn_{h}", type="secondary", use_container_width=False):
-                st.session_state[f"hour_check_{h}"] = not st.session_state.get(f"hour_check_{h}", False)
-                st.rerun()
+        col_hidden = st.container()
+        with col_hidden:
+            st.markdown('<div style="display: none;">', unsafe_allow_html=True)
+            for h in range(1, 10):
+                if st.button(f"Toggle {h}", key=f"hour_btn_{h}", type="secondary", use_container_width=False):
+                    st.session_state[f"hour_check_{h}"] = not st.session_state.get(f"hour_check_{h}", False)
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         
