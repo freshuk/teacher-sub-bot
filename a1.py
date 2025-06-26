@@ -12,52 +12,19 @@ import base64
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-/* General Styles */
-button, select, input, label {font-size:1rem;}
-section[data-testid="stSidebar"] {display:none;}
-
-/* Header Styles */
+/* ... (רוב ה-CSS נשאר זהה, הסרנו את מה שלא צריך) ... */
 .main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
 .main-header img { width: 80px !important; margin-bottom: 0.5rem; }
 .main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
-
-/* Chat Bubble Styles */
 .chat-msg { background:#f5f8ff; border-radius:14px; padding:0.7rem 1rem; margin:0.3rem 0; color: #31333F; direction: rtl; text-align: right; }
 .chat-user {background:#d2e1ff;}
-
-/* RTL Widgets Alignment */
 div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
 div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
-
-/* ### שיפור: עיצוב רשת בחירת השעות ### */
-.hour-grid-container {
-    display: flex;
-    flex-direction: row;
-    gap: 10px; /* רווח בין העמודות */
-}
-.hour-grid-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* רווח בין השעות */
-}
-.hour-checkbox-item {
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 10px;
-    display: flex;
-    flex-direction: row-reverse; /* מיישר את התיבה לשמאל והטקסט לימין */
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-}
-.hour-checkbox-item:hover {
-    background-color: #f5f8ff;
-}
-.hour-checkbox-item span {
-    font-weight: bold;
-    font-size: 1.1rem;
-}
+.hour-grid-container { display: flex; flex-direction: row; gap: 10px; }
+.hour-grid-col { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.hour-checkbox-item { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; cursor: pointer; }
+.hour-checkbox-item:hover { background-color: #f5f8ff; }
+.hour-checkbox-item span { font-weight: bold; font-size: 1.1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -186,14 +153,12 @@ if active_tab == tab_names[0]:
             out[h]=(subj,opts)
         return out
 
-    ### שינוי: פונקציית קולבק חדשה לבחירת מורה מכפתור ###
     def select_teacher(teacher_name):
         add("user", teacher_name)
         st.session_state.teacher = teacher_name
         st.session_state.stage = "day"
         add("bot", f"מעולה, בחרנו במורה **{teacher_name}**.\nלאיזה יום היא נעדרת?")
-        st.session_state.teacher_search = "" # איפוס החיפוש
-        st.session_state.teacher_expander = False # סגירת האקספנדר
+        st.session_state.teacher_search = ""
 
     def choose_day():
         d=st.session_state.sel_day
@@ -235,17 +200,18 @@ if active_tab == tab_names[0]:
         st.session_state.stage="teacher"
         add("bot", "בטח, נתחיל מחדש. איזו מורה נעדרת הפעם?")
 
-    ### שינוי: החלפת ה-selectbox ברכיב מותאם אישית ###
+    ### שינוי: החלפת ה-selectbox ברכיב מותאם אישית עם קונטיינר נגלל ###
     def display_teacher_selection():
         if not TEACHERS: return
         
-        if 'teacher_expander' not in st.session_state:
-            st.session_state.teacher_expander = True
-
-        with st.expander("לחצי כאן לבחירת מורה", expanded=st.session_state.teacher_expander):
-            search_term = st.text_input("חיפוש מהיר...", key="teacher_search").strip().lower()
-            
+        search_term = st.text_input("חיפוש מהיר...", key="teacher_search", placeholder="הקלידי שם מורה לסינון...").strip().lower()
+        
+        # שימוש בקונטיינר עם גובה קבוע וגלילה
+        with st.container(height=300):
             filtered_teachers = [t for t in TEACHERS if search_term in t.lower()]
+            
+            if not filtered_teachers:
+                st.info("לא נמצאו מורים תואמים.")
             
             for teacher in filtered_teachers:
                 st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
@@ -278,7 +244,7 @@ if active_tab == tab_names[0]:
                 st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            st.markdown("<br>", unsafe_allow_html=True) # רווח קטן
+            st.markdown("<br>", unsafe_allow_html=True)
             submitted = st.form_submit_button("מצא מחליפים", use_container_width=True)
             if submitted:
                 selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_{h}", False)]
@@ -333,20 +299,18 @@ elif active_tab == tab_names[1]:
     if not TEACHERS:
         st.warning("לא נטענו מורים. בדוק את החיבור לגוגל שיטס ואת מבנה הקובץ.")
     else:
-        # שימוש באותו רכיב בחירה מותאם אישית גם כאן
-        if 'sched_expander' not in st.session_state:
-            st.session_state.sched_expander = True
+        search_term_sched = st.text_input("חיפוש מהיר...", key="schedule_teacher_search", placeholder="הקלידי שם מורה לסינון...").strip().lower()
         
-        with st.expander("לחצי כאן לבחירת מורה לצפייה", expanded=st.session_state.sched_expander):
-            search_term_sched = st.text_input("חיפוש מהיר...", key="schedule_teacher_search").strip().lower()
+        with st.container(height=300):
             filtered_teachers_sched = [t for t in TEACHERS if search_term_sched in t.lower()]
             
+            if not filtered_teachers_sched:
+                st.info("לא נמצאו מורים תואמים.")
+
             for teacher in filtered_teachers_sched:
                 if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
                     st.session_state.selected_schedule_teacher = teacher
-                    st.session_state.sched_expander = False # סגירת האקספנדר
-                    st.rerun() # Rerun כדי להציג את הטבלה מחוץ לאקספנדר
-
+        
         if 'selected_schedule_teacher' in st.session_state and st.session_state.selected_schedule_teacher:
             selected_teacher = st.session_state.selected_schedule_teacher
             st.write(f"**מציג מערכת עבור: {selected_teacher}**")
