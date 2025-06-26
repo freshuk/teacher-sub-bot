@@ -12,7 +12,7 @@ import base64
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-/* ... (רוב ה-CSS נשאר זהה, הסרנו את מה שלא צריך) ... */
+/* ... (CSS is now much simpler as we removed the problematic fixes) ... */
 .main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
 .main-header img { width: 80px !important; margin-bottom: 0.5rem; }
 .main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
@@ -53,7 +53,6 @@ PRIORITY = {key: i for i, key in enumerate(AVAILABLE_KEYWORDS)}
 
 @st.cache_data(ttl=600, show_spinner="טוען מערכת שעות עדכנית...")
 def load_data_from_gsheet():
-    # ... (הפונקציה נשארת זהה)
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
@@ -110,7 +109,7 @@ active_tab = st.radio(
 # ──────────────────────────────────────────────────────────
 if active_tab == tab_names[0]:
     if "chat" not in st.session_state:
-        st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 אשמח לעזור לך! בבקשה בחרי את שם המורה הנעדר\\ת ונמשיך משם.")]
+        st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 אשמח לעזור לך! בבקשה הקלידי את שם המורה הנעדר\\ת ונמשיך משם.")]
         st.session_state.stage="teacher"
     
     def add(role,msg):
@@ -198,23 +197,27 @@ if active_tab == tab_names[0]:
 
     def start_new_search():
         st.session_state.stage="teacher"
-        add("bot", "בטח, נתחיל מחדש. איזו מורה נעדרת הפעם?")
+        add("bot", "בטח, נתחיל מחדש. הקלידי את שם המורה הנעדר\\ת.")
 
-    ### שינוי: החלפת ה-selectbox ברכיב מותאם אישית עם קונטיינר נגלל ###
+    ### שינוי: החלפת ה-selectbox ברכיב חיפוש עם כפתורים ###
     def display_teacher_selection():
         if not TEACHERS: return
         
-        search_term = st.text_input("חיפוש מהיר...", key="teacher_search", placeholder="הקלידי שם מורה לסינון...").strip().lower()
-        
-        # שימוש בקונטיינר עם גובה קבוע וגלילה
-        with st.container(height=300):
-            filtered_teachers = [t for t in TEACHERS if search_term in t.lower()]
+        search_term = st.text_input(
+            "הקלידי שם מורה כדי לחפש:",
+            key="teacher_search",
+            placeholder="לדוגמה: אביטל"
+        )
+
+        search_term = search_term.strip().lower()
+        if search_term:
+            filtered_teachers = [t for t in TEACHERS if search_term in t.lower()][:5]
             
             if not filtered_teachers:
-                st.info("לא נמצאו מורים תואמים.")
-            
-            for teacher in filtered_teachers:
-                st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
+                st.info("לא נמצאו מורים תואמים לחיפוש.")
+            else:
+                for teacher in filtered_teachers:
+                    st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
 
     def display_day_selection():
         st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day, label_visibility="collapsed")
@@ -299,19 +302,26 @@ elif active_tab == tab_names[1]:
     if not TEACHERS:
         st.warning("לא נטענו מורים. בדוק את החיבור לגוגל שיטס ואת מבנה הקובץ.")
     else:
-        search_term_sched = st.text_input("חיפוש מהיר...", key="schedule_teacher_search", placeholder="הקלידי שם מורה לסינון...").strip().lower()
-        
-        with st.container(height=300):
-            filtered_teachers_sched = [t for t in TEACHERS if search_term_sched in t.lower()]
+        search_term_sched = st.text_input(
+            "הקלידי שם מורה לצפייה במערכת:",
+            key="schedule_teacher_search",
+            placeholder="לדוגמה: אביטל"
+        ).strip().lower()
+
+        if 'selected_schedule_teacher' not in st.session_state:
+            st.session_state.selected_schedule_teacher = None
+
+        if search_term_sched:
+            filtered_teachers_sched = [t for t in TEACHERS if search_term_sched in t.lower()][:5]
             
             if not filtered_teachers_sched:
-                st.info("לא נמצאו מורים תואמים.")
-
-            for teacher in filtered_teachers_sched:
-                if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
-                    st.session_state.selected_schedule_teacher = teacher
+                st.info("לא נמצאו מורים תואמים לחיפוש.")
+            else:
+                for teacher in filtered_teachers_sched:
+                    if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
+                        st.session_state.selected_schedule_teacher = teacher
         
-        if 'selected_schedule_teacher' in st.session_state and st.session_state.selected_schedule_teacher:
+        if st.session_state.selected_schedule_teacher:
             selected_teacher = st.session_state.selected_schedule_teacher
             st.write(f"**מציג מערכת עבור: {selected_teacher}**")
             
