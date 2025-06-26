@@ -11,42 +11,8 @@ import base64
 # ───────── הגדרות בסיס + CSS ─────────
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 
-css_original = """
-<style>
-/* עיצוב מקורי נשמר */
-.main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
-.main-header img { width: 80px !important; margin-bottom: 0.5rem; }
-.main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
-.chat-msg { background:#f5f8ff; border-radius:14px; padding:0.7rem 1rem; margin:0.3rem 0; color: #31333F; direction: rtl; text-align: right; }
-.chat-user {background:#d2e1ff;}
-div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
-div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
-
-/* שיפור: עיצוב חדש ומשופר לבחירת השעות */
-.hour-grid-container {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    direction: rtl;
-}
-.hour-card {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s;
-}
-.hour-card.selected {
-    background-color: #d2e1ff;
-    border-color: #a7c3ff;
-}
-.hour-card span {
-    font-weight: bold;
-    font-size: 1.1rem;
-}
-</style>
-"""
+# CSS מפוצל למקטעים
+st.markdown("""
 <style>
 /* עיצוב כללי משופר */
 .stApp {
@@ -78,9 +44,9 @@ div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right:
     text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
 </style>
-"""
+""", unsafe_allow_html=True)
 
-css_chat = """
+st.markdown("""
 <style>
 /* עיצוב הצ'אט */
 .chat-msg { 
@@ -102,15 +68,14 @@ css_chat = """
 .chat-msg:not(.chat-user) {
     margin-right: 2rem;
 }
-
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 </style>
-"""
+""", unsafe_allow_html=True)
 
-css_tabs = """
+st.markdown("""
 <style>
 /* עיצוב הטאבים */
 div[data-testid="stRadio"] > div { 
@@ -138,9 +103,9 @@ div[data-testid="stRadio"] label[data-selected="true"] {
     border-color: #667eea;
 }
 </style>
-"""
+""", unsafe_allow_html=True)
 
-css_hours = """
+st.markdown("""
 <style>
 /* עיצוב משופר לבחירת השעות */
 .hours-selection-container {
@@ -194,9 +159,9 @@ css_hours = """
     transform: translateY(-2px);
 }
 </style>
-"""
+""", unsafe_allow_html=True)
 
-css_components = """
+st.markdown("""
 <style>
 /* עיצוב כפתורים */
 .stButton > button {
@@ -213,7 +178,6 @@ css_components = """
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
-
 /* עיצוב תיבות בחירה וטקסט */
 .stSelectbox > div > div {
     background: white;
@@ -230,7 +194,6 @@ css_components = """
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
-
 /* עיצוב רשימת מורים */
 .teacher-list-container {
     background: white;
@@ -250,7 +213,6 @@ css_components = """
     color: white;
     border-color: #667eea;
 }
-
 /* עיצוב לנייד */
 @media (max-width: 768px) {
     .hours-grid {
@@ -264,14 +226,7 @@ css_components = """
     }
 }
 </style>
-"""
-
-# הוספת כל ה-CSS
-st.markdown(css_general, unsafe_allow_html=True)
-st.markdown(css_chat, unsafe_allow_html=True)
-st.markdown(css_tabs, unsafe_allow_html=True)
-st.markdown(css_hours, unsafe_allow_html=True)
-st.markdown(css_components, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ───────── אייקון וכותרת ─────────
 def get_image_as_base64(path):
@@ -498,54 +453,11 @@ if active_tab == tab_names[0]:
         st.markdown('<div class="hours-selection-container">', unsafe_allow_html=True)
         st.markdown("##### בחירת שעות להיעדרות")
         
-        # Create custom checkboxes with HTML
-        hours_html = '<div class="hours-grid">'
-        for h in range(1, 10):
-            checked = "checked" if st.session_state.get(f"hour_check_{h}", False) else ""
-            hours_html += f'''
-            <div class="hour-option">
-                <input type="checkbox" id="hour_{h}" class="hour-checkbox" {checked}>
-                <label for="hour_{h}" class="hour-label">שעה {h}</label>
-            </div>
-            '''
-        hours_html += '</div>'
-        
-        st.markdown(hours_html, unsafe_allow_html=True)
-        
-        # JavaScript to sync checkbox states with Streamlit
-        components.html(f"""
-            <script>
-            // Function to update Streamlit when checkbox changes
-            function updateStreamlit(hour, isChecked) {{
-                const event = new CustomEvent('streamlit:setComponentValue', {{
-                    detail: {{hour: hour, checked: isChecked}}
-                }});
-                window.parent.document.dispatchEvent(event);
-            }}
-            
-            // Add event listeners to all checkboxes
-            for (let i = 1; i <= 9; i++) {{
-                const checkbox = window.parent.document.getElementById('hour_' + i);
-                if (checkbox) {{
-                    checkbox.addEventListener('change', function() {{
-                        // Create a hidden button in Streamlit and click it
-                        const btn = window.parent.document.querySelector(`[key="hour_btn_${{i}}"]`);
-                        if (btn) btn.click();
-                    }});
-                }}
-            }}
-            </script>
-        """, height=0)
-        
-        # Hidden buttons to handle checkbox changes
-        col_hidden = st.container()
-        with col_hidden:
-            st.markdown('<div style="display: none;">', unsafe_allow_html=True)
-            for h in range(1, 10):
-                if st.button(f"Toggle {h}", key=f"hour_btn_{h}", type="secondary", use_container_width=False):
-                    st.session_state[f"hour_check_{h}"] = not st.session_state.get(f"hour_check_{h}", False)
-                    st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+        # Create grid with streamlit checkboxes in a more elegant way
+        cols = st.columns(3)
+        for i, h in enumerate(range(1, 10)):
+            with cols[i % 3]:
+                st.checkbox(f"שעה {h}", key=f"hour_check_{h}")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
