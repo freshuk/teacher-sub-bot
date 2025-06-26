@@ -12,7 +12,7 @@ import base64
 st.set_page_config(page_title="צמרובוט – העוזר האישי שלי", layout="centered")
 st.markdown("""
 <style>
-/* ... (CSS is now much simpler as we removed the problematic fixes) ... */
+/* ... (CSS קיים) ... */
 .main-header { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1rem; }
 .main-header img { width: 80px !important; margin-bottom: 0.5rem; }
 .main-header h3 { font-size: 1.8rem; font-weight: 800; text-align: center; width: 100%; }
@@ -20,11 +20,34 @@ st.markdown("""
 .chat-user {background:#d2e1ff;}
 div[data-testid="stRadio"] > div { flex-direction: row-reverse; justify-content: flex-start; }
 div[data-testid="stRadio"] label { margin-left: 0.5rem !important; margin-right: 0 !important; }
-.hour-grid-container { display: flex; flex-direction: row; gap: 10px; }
-.hour-grid-col { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-.hour-checkbox-item { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; cursor: pointer; }
-.hour-checkbox-item:hover { background-color: #f5f8ff; }
-.hour-checkbox-item span { font-weight: bold; font-size: 1.1rem; }
+
+/* ### שיפור: עיצוב חדש ומשופר לבחירת השעות ### */
+.hour-grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Always two columns */
+    gap: 10px;
+    direction: rtl;
+}
+.hour-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+.hour-card.selected {
+    background-color: #d2e1ff; /* Same as user chat bubble */
+    border-color: #a7c3ff;
+}
+.hour-card span {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+/* Hide the actual toggle widget, we only use it for state */
+div[data-testid="stForm"] div[data-testid="stToggle"] {
+    display: none;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,6 +76,7 @@ PRIORITY = {key: i for i, key in enumerate(AVAILABLE_KEYWORDS)}
 
 @st.cache_data(ttl=600, show_spinner="טוען מערכת שעות עדכנית...")
 def load_data_from_gsheet():
+    # ... (הפונקציה נשארת זהה)
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
@@ -109,7 +133,7 @@ active_tab = st.radio(
 # ──────────────────────────────────────────────────────────
 if active_tab == tab_names[0]:
     if "chat" not in st.session_state:
-        st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 אשמח לעזור לך! בבקשה הקלידי את שם המורה הנעדר\\ת ונמשיך משם.")]
+        st.session_state.chat=[("bot","שלום גלית! אני צמרובוט 😊 אשמח לעזור לך! בבקשה בחרי את שם המורה הנעדר\\ת ונמשיך משם.")]
         st.session_state.stage="teacher"
     
     def add(role,msg):
@@ -197,28 +221,21 @@ if active_tab == tab_names[0]:
 
     def start_new_search():
         st.session_state.stage="teacher"
-        add("bot", "בטח, נתחיל מחדש. הקלידי את שם המורה הנעדר\\ת.")
+        add("bot", "בטח, נתחיל מחדש. בחרי את שם המורה הנעדר\\ת.")
 
-    ### שינוי: החלפת ה-selectbox ברכיב חיפוש עם כפתורים ###
     def display_teacher_selection():
         if not TEACHERS: return
         
-        search_term = st.text_input(
-            "הקלידי שם מורה כדי לחפש:",
-            key="teacher_search_chat",
-            placeholder="לדוגמה: אביטל"
-        )
-
-        search_term = search_term.strip().lower()
-        if search_term:
+        search_term = st.text_input("חיפוש מהיר...", key="teacher_search_chat", placeholder="הקלידי שם מורה לסינון...").strip().lower()
+        
+        with st.container(height=300):
             filtered_teachers = [t for t in TEACHERS if search_term in t.lower()]
             
-            with st.container(height=300):
-                if not filtered_teachers:
-                    st.info("לא נמצאו מורים תואמים לחיפוש.")
-                else:
-                    for teacher in filtered_teachers:
-                        st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
+            if not filtered_teachers:
+                st.info("לא נמצאו מורים תואמים.")
+            
+            for teacher in filtered_teachers:
+                st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
 
     def display_day_selection():
         st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day, label_visibility="collapsed")
@@ -226,32 +243,48 @@ if active_tab == tab_names[0]:
     def display_scope_selection():
         st.radio("",("יום שלם","בשעות ספציפיות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
     
+    ### שינוי: פונקציית תצוגה חדשה עם עיצוב משופר ###
     def display_hour_selection():
         add("bot", "סמני את השעות שבהן המורה נעדרת ולחצי על 'מצא מחליפים'.")
         
         with st.form(key="hours_form"):
-            st.markdown('<div class="hour-grid-container">', unsafe_allow_html=True)
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown('<div class="hour-grid-col">', unsafe_allow_html=True)
-                for h in range(1, 6):
-                    st.markdown(f'<div class="hour-checkbox-item"><span>שעה {h}</span>', unsafe_allow_html=True)
-                    st.checkbox("", key=f"hour_{h}", label_visibility="collapsed")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            with col2:
-                st.markdown('<div class="hour-grid-col">', unsafe_allow_html=True)
-                for h in range(6, 10):
-                    st.markdown(f'<div class="hour-checkbox-item"><span>שעה {h}</span>', unsafe_allow_html=True)
-                    st.checkbox("", key=f"hour_{h}", label_visibility="collapsed")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Create the grid using markdown and CSS
+            grid_html = '<div class="hour-grid-container">'
+            for h in range(1, 10):
+                # Use session state to remember the selection
+                is_selected = st.session_state.get(f"hour_toggle_{h}", False)
+                selected_class = "selected" if is_selected else ""
+                
+                # We create a clickable card using markdown
+                # The st.button is invisible and handles the click
+                grid_html += f'<div id="hour-card-{h}" class="hour-card {selected_class}"><span>שעה {h}</span></div>'
+            grid_html += '</div>'
             
+            st.markdown(grid_html, unsafe_allow_html=True)
+
+            # Create hidden toggles to manage the state
+            for h in range(1, 10):
+                st.toggle(f"Toggle for hour {h}", key=f"hour_toggle_{h}")
+
+            # JavaScript to make the cards clickable and update the toggles
+            components.html("""
+                <script>
+                for (let i = 1; i < 10; i++) {
+                    const card = window.parent.document.getElementById(`hour-card-${i}`);
+                    const toggle = window.parent.document.querySelector(`[data-testid="stToggle"][key="hour_toggle_${i}"] button`);
+                    if (card && toggle) {
+                        card.addEventListener('click', () => {
+                            toggle.click();
+                        });
+                    }
+                }
+                </script>
+            """, height=0)
+
             st.markdown("<br>", unsafe_allow_html=True)
             submitted = st.form_submit_button("מצא מחליפים", use_container_width=True)
             if submitted:
-                selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_{h}", False)]
+                selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_toggle_{h}", False)]
                 if not selected_hours:
                     st.warning("יש לבחור לפחות שעה אחת.")
                 else:
@@ -312,16 +345,15 @@ elif active_tab == tab_names[1]:
         if 'selected_schedule_teacher' not in st.session_state:
             st.session_state.selected_schedule_teacher = None
 
-        if search_term_sched:
+        with st.container(height=300):
             filtered_teachers_sched = [t for t in TEACHERS if search_term_sched in t.lower()]
             
-            with st.container(height=300):
-                if not filtered_teachers_sched:
-                    st.info("לא נמצאו מורים תואמים לחיפוש.")
-                else:
-                    for teacher in filtered_teachers_sched:
-                        if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
-                            st.session_state.selected_schedule_teacher = teacher
+            if not filtered_teachers_sched:
+                st.info("לא נמצאו מורים תואמים לחיפוש.")
+            else:
+                for teacher in filtered_teachers_sched:
+                    if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
+                        st.session_state.selected_schedule_teacher = teacher
         
         if st.session_state.selected_schedule_teacher:
             selected_teacher = st.session_state.selected_schedule_teacher
