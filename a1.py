@@ -43,6 +43,14 @@ st.markdown("""
     margin: 0;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
+/* הסתרת אלמנטים ריקים */
+.element-container:has(> div:empty) {
+    display: none !important;
+}
+/* תיקון ליישור אלמנטים */
+div[data-testid="column"] > div {
+    width: 100%;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -115,48 +123,13 @@ st.markdown("""
     box-shadow: 0 5px 20px rgba(0,0,0,0.08);
     margin: 1rem 0;
 }
-.hours-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    direction: rtl;
-    margin-top: 1.5rem;
+/* עיצוב ה-checkbox */
+div[data-testid="stCheckbox"] {
+    margin: 0.5rem 0;
 }
-.hour-option {
-    position: relative;
-    cursor: pointer;
-    user-select: none;
-}
-.hour-checkbox {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-}
-.hour-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.2rem;
-    background: #f5f7fa;
-    border: 2px solid #e8eaed;
-    border-radius: 15px;
+div[data-testid="stCheckbox"] label {
     font-weight: 600;
     font-size: 1.1rem;
-    transition: all 0.3s ease;
-    text-align: center;
-}
-.hour-checkbox:checked ~ .hour-label {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: #667eea;
-    transform: scale(1.05);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-}
-.hour-option:hover .hour-label {
-    border-color: #667eea;
-    transform: translateY(-2px);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -213,16 +186,22 @@ st.markdown("""
     color: white;
     border-color: #667eea;
 }
+/* תיקון לגלילה במובייל */
+div[data-testid="stVerticalBlock"] > div:has(> div > .teacher-list-container) {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-height: 300px !important;
+}
 /* עיצוב לנייד */
 @media (max-width: 768px) {
-    .hours-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
     .chat-msg:not(.chat-user) {
         margin-right: 1rem;
     }
     .chat-user {
         margin-left: 1rem;
+    }
+    .main-header h3 {
+        font-size: 1.5rem;
     }
 }
 </style>
@@ -357,7 +336,9 @@ if active_tab == tab_names[0]:
         st.session_state.teacher = teacher_name
         st.session_state.stage = "day"
         add("bot", f"מעולה! בחרת ב**{teacher_name}**. 📅 לאיזה יום היא נעדרת?")
-        st.session_state.teacher_search_chat = ""
+        # תיקון - מחיקת המפתח אם קיים
+        if 'teacher_search_chat' in st.session_state:
+            del st.session_state.teacher_search_chat
 
     def choose_day():
         d=st.session_state.sel_day
@@ -377,6 +358,9 @@ if active_tab == tab_names[0]:
             calculate()
         elif sc=="בשעות ספציפיות":
             st.session_state.stage="select_hours"
+            # איפוס בחירת השעות
+            for h in range(1, 10):
+                st.session_state[f"hour_check_{h}"] = False
 
     def calculate():
         with st.spinner("🔍 צמרובוט מחפש את המחליפים הטובים ביותר..."): time.sleep(1.1)
@@ -399,45 +383,30 @@ if active_tab == tab_names[0]:
     def start_new_search():
         st.session_state.stage="teacher"
         add("bot", "בואי נתחיל חיפוש חדש! 🔄 איזו מורה נעדרת הפעם?")
+        # איפוס בחירת השעות
+        for h in range(1, 10):
+            if f"hour_check_{h}" in st.session_state:
+                st.session_state[f"hour_check_{h}"] = False
 
     def display_teacher_selection():
         if not TEACHERS: return
         
-        col1, col2 = st.columns([3, 2])
+        st.markdown("#### 📋 בחרי מורה מהרשימה")
         
-        with col1:
-            st.markdown("##### 🔍 חיפוש מהיר")
-            search_term = st.text_input("הקלידי שם מורה...", key="teacher_search_chat", placeholder="התחילי להקליד...").strip().lower()
+        # תיבת בחירה עם חיפוש משולב
+        selected_teacher = st.selectbox(
+            "הקלידי או בחרי שם מורה:",
+            [""] + TEACHERS,
+            key="teacher_dropdown",
+            help="ניתן להקליד לחיפוש מהיר או לבחור מהרשימה"
+        )
         
-        with col2:
-            st.markdown("##### 📋 בחירה מרשימה")
-            # רשימה נגללת למובייל
-            selected_from_dropdown = st.selectbox(
-                "בחרי מורה:",
-                [""] + TEACHERS,
-                key="teacher_dropdown",
-                label_visibility="collapsed"
-            )
-            if selected_from_dropdown and selected_from_dropdown != "":
-                select_teacher(selected_from_dropdown)
-                st.session_state.teacher_dropdown = ""
-                st.rerun()
-        
-        if search_term:
-            st.markdown("##### 📌 תוצאות חיפוש")
-            with st.container(height=250):
-                filtered_teachers = [t for t in TEACHERS if search_term in t.lower()]
-                
-                if not filtered_teachers:
-                    st.info("🔍 לא נמצאו מורים תואמים לחיפוש.")
-                else:
-                    st.markdown('<div class="teacher-list-container">', unsafe_allow_html=True)
-                    for teacher in filtered_teachers:
-                        st.button(teacher, key=f"btn_{teacher}", on_click=select_teacher, args=(teacher,), use_container_width=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
+        if selected_teacher and selected_teacher != "":
+            select_teacher(selected_teacher)
+            st.rerun()
 
     def display_day_selection():
-        st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day, label_visibility="collapsed")
+        st.selectbox("בחרי יום:",[""]+DAYS,key="sel_day",on_change=choose_day)
     
     def display_scope_selection():
         st.radio("",("יום שלם","בשעות ספציפיות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
@@ -450,48 +419,57 @@ if active_tab == tab_names[0]:
             if f"hour_check_{h}" not in st.session_state:
                 st.session_state[f"hour_check_{h}"] = False
         
-        st.markdown('<div class="hours-selection-container">', unsafe_allow_html=True)
-        st.markdown("##### בחירת שעות להיעדרות")
-        
-        # Create grid with streamlit checkboxes in a more elegant way
-        cols = st.columns(3)
-        for i, h in enumerate(range(1, 10)):
-            with cols[i % 3]:
-                st.checkbox(f"שעה {h}", key=f"hour_check_{h}")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("✅ מצא מחליפים", use_container_width=True, type="primary"):
-                selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_check_{h}", False)]
-                if not selected_hours:
-                    st.warning("⚠️ יש לבחור לפחות שעה אחת.")
-                else:
-                    st.session_state.selected_hours = selected_hours
-                    hours_str = ", ".join(map(str, selected_hours))
-                    add("user", f"שעות נבחרות: {hours_str}")
-                    calculate()
-        
-        with col2:
-            if st.button("🔄 בחר הכל", use_container_width=True):
-                for h in range(1, 10):
-                    st.session_state[f"hour_check_{h}"] = True
-                st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container():
+            st.markdown("##### בחירת שעות להיעדרות")
+            
+            # Create grid with streamlit checkboxes in a more elegant way
+            cols = st.columns(3)
+            for i, h in enumerate(range(1, 10)):
+                with cols[i % 3]:
+                    st.checkbox(f"שעה {h}", key=f"hour_check_{h}")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ מצא מחליפים", use_container_width=True, type="primary"):
+                    selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_check_{h}", False)]
+                    if not selected_hours:
+                        st.warning("⚠️ יש לבחור לפחות שעה אחת.")
+                    else:
+                        st.session_state.selected_hours = selected_hours
+                        hours_str = ", ".join(map(str, selected_hours))
+                        add("user", f"שעות נבחרות: {hours_str}")
+                        calculate()
+            
+            with col2:
+                if st.button("🔄 בחר הכל", use_container_width=True):
+                    for h in range(1, 10):
+                        st.session_state[f"hour_check_{h}"] = True
+                    st.rerun()
 
     def display_done_state():
         st.button("🔎 חיפוש חדש", on_click=start_new_search, type="primary")
     
+    # הצגת האלמנטים לפי השלב הנוכחי
     stage = st.session_state.get('stage', 'teacher')
-    if stage =="teacher": display_teacher_selection()
-    elif stage =="day": display_day_selection()
-    elif stage =="scope": display_scope_selection()
-    elif stage == "select_hours": display_hour_selection()
-    elif stage == "done": display_done_state()
     
+    # מיכל נפרד לאלמנטי הקלט שיימחק אחרי בחירה
+    input_container = st.container()
+    
+    with input_container:
+        if stage =="teacher": 
+            display_teacher_selection()
+        elif stage =="day": 
+            display_day_selection()
+        elif stage =="scope": 
+            display_scope_selection()
+        elif stage == "select_hours": 
+            display_hour_selection()
+        elif stage == "done": 
+            display_done_state()
+    
+    # הצגת הצ'אט
     render_chat(chat_container)
+    
     st.divider()
     col1, col2 = st.columns([3, 1])
     with col2:
@@ -502,16 +480,16 @@ if active_tab == tab_names[0]:
                     del st.session_state[key]
             st.rerun()
     
-    st.markdown('<div id="end-of-chat-anchor" style="height: 0px;"></div>', unsafe_allow_html=True)
+    # JavaScript לגלילה אוטומטית
     components.html(
         """
         <script>
-            const anchor = window.parent.document.getElementById("end-of-chat-anchor");
-            if (anchor) {
-                setTimeout(() => {
-                    anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                }, 250);
-            }
+            setTimeout(() => {
+                const messages = window.parent.document.querySelectorAll('.chat-msg');
+                if (messages.length > 0) {
+                    messages[messages.length - 1].scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }
+            }, 100);
         </script>
         """,
         height=0,
@@ -526,43 +504,17 @@ elif active_tab == tab_names[1]:
     if not TEACHERS:
         st.warning("לא נטענו מורים. בדוק את החיבור לגוגל שיטס ואת מבנה הקובץ.")
     else:
-        col1, col2 = st.columns([3, 2])
+        st.markdown("#### 🔍 חיפוש מורה")
         
-        with col1:
-            search_term_sched = st.text_input(
-                "🔍 חיפוש מהיר:",
-                key="schedule_teacher_search",
-                placeholder="הקלידי שם מורה..."
-            ).strip().lower()
+        # תיבת בחירה עם חיפוש משולב
+        selected_teacher = st.selectbox(
+            "הקלידי או בחרי שם מורה לצפייה במערכת:",
+            [""] + TEACHERS,
+            key="schedule_dropdown",
+            help="ניתן להקליד לחיפוש מהיר או לבחור מהרשימה"
+        )
         
-        with col2:
-            # רשימה נגללת למובייל
-            selected_from_dropdown_sched = st.selectbox(
-                "📋 או בחרי מרשימה:",
-                [""] + TEACHERS,
-                key="schedule_dropdown"
-            )
-            if selected_from_dropdown_sched and selected_from_dropdown_sched != "":
-                st.session_state.selected_schedule_teacher = selected_from_dropdown_sched
-
-        if 'selected_schedule_teacher' not in st.session_state:
-            st.session_state.selected_schedule_teacher = None
-
-        if search_term_sched:
-            with st.container(height=200):
-                filtered_teachers_sched = [t for t in TEACHERS if search_term_sched in t.lower()]
-                
-                if not filtered_teachers_sched:
-                    st.info("🔍 לא נמצאו מורים תואמים לחיפוש.")
-                else:
-                    st.markdown('<div class="teacher-list-container">', unsafe_allow_html=True)
-                    for teacher in filtered_teachers_sched:
-                        if st.button(teacher, key=f"sched_btn_{teacher}", use_container_width=True):
-                            st.session_state.selected_schedule_teacher = teacher
-                    st.markdown('</div>', unsafe_allow_html=True)
-        
-        if st.session_state.selected_schedule_teacher:
-            selected_teacher = st.session_state.selected_schedule_teacher
+        if selected_teacher and selected_teacher != "":
             st.markdown(f"### מערכת שעות של: **{selected_teacher}**")
             
             teacher_df = df[df['teacher'] == selected_teacher]
