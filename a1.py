@@ -50,7 +50,6 @@ PRIORITY = {key: i for i, key in enumerate(AVAILABLE_KEYWORDS)}
 
 @st.cache_data(ttl=600, show_spinner="טוען מערכת שעות עדכנית...")
 def load_data_from_gsheet():
-    # ... (הפונקציה נשארת זהה)
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
@@ -214,7 +213,6 @@ if active_tab == tab_names[0]:
     def display_hour_selection():
         add("bot", "סמני את השעות שבהן המורה נעדרת ולחצי על 'מצא מחליפים'.")
         
-        # שימוש ב-st.form כדי למנוע rerun על כל לחיצה
         with st.form(key="hours_form"):
             cols = st.columns(2)
             for h in range(1, 10):
