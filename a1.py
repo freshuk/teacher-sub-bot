@@ -43,30 +43,23 @@ st.markdown("""
     margin: 0;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
-/* הסתרת אלמנטים ריקים - משופר */
-.element-container:has(> div:empty) {
+/* הסתרת אלמנטים ריקים - חזק יותר */
+.element-container:empty,
+.element-container:has(> div:empty),
+.element-container:has(> .stMarkdown:empty),
+.element-container:has(> .stMarkdown > div:empty),
+div[data-testid="column"]:empty,
+div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:empty),
+.stMarkdown:empty,
+.stMarkdown:has(> div:empty) {
     display: none !important;
-}
-.element-container:has(> .stMarkdown:empty) {
-    display: none !important;
-}
-div[data-testid="column"]:empty {
-    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 /* תיקון ליישור אלמנטים */
 div[data-testid="column"] > div {
     width: 100%;
-}
-/* תיקון גלילה ב-selectbox במובייל */
-.stSelectbox select {
-    -webkit-overflow-scrolling: touch !important;
-    overflow-y: auto !important;
-}
-/* במובייל - הגדלת גובה הרשימה */
-@media (max-width: 768px) {
-    .stSelectbox select {
-        max-height: 300px !important;
-    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -132,39 +125,6 @@ div[data-testid="stRadio"] label[data-selected="true"] {
 
 st.markdown("""
 <style>
-/* עיצוב משופר לבחירת השעות */
-.hours-selection-container {
-    background: white;
-    border-radius: 20px;
-    padding: 2rem;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-    margin: 1rem 0;
-}
-/* עיצוב ה-checkbox */
-div[data-testid="stCheckbox"] {
-    margin: 0.5rem 0;
-}
-div[data-testid="stCheckbox"] label {
-    font-weight: 600;
-    font-size: 1.1rem;
-}
-/* רשת שעות - התאמה למובייל */
-@media (max-width: 768px) {
-    /* הסתרת העמודה השלישית במובייל */
-    .hours-selection-grid > div[data-testid="column"]:nth-child(3) {
-        display: none !important;
-    }
-    /* הגדלת העמודות הנותרות */
-    .hours-selection-grid > div[data-testid="column"] {
-        flex: 1 1 50% !important;
-        max-width: 50% !important;
-    }
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
 /* עיצוב כפתורים */
 .stButton > button {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -186,6 +146,12 @@ st.markdown("""
     border-radius: 12px;
     border: 2px solid #e8eaed;
     padding: 0.5rem;
+}
+/* תיקון גלילה למובייל */
+.stSelectbox select {
+    max-height: 400px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
 }
 .stTextInput > div > div {
     background: white;
@@ -215,11 +181,21 @@ st.markdown("""
     color: white;
     border-color: #667eea;
 }
-/* תיקון לגלילה במובייל */
-div[data-testid="stVerticalBlock"] > div:has(> div > .teacher-list-container) {
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    max-height: 300px !important;
+/* עיצוב משופר לבחירת השעות */
+.hours-container {
+    background: white;
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    margin: 1rem 0;
+}
+/* עיצוב ה-checkbox */
+div[data-testid="stCheckbox"] {
+    margin: 0.5rem 0;
+}
+div[data-testid="stCheckbox"] label {
+    font-weight: 600;
+    font-size: 1.1rem;
 }
 /* עיצוב לנייד */
 @media (max-width: 768px) {
@@ -231,6 +207,10 @@ div[data-testid="stVerticalBlock"] > div:has(> div > .teacher-list-container) {
     }
     .main-header h3 {
         font-size: 1.5rem;
+    }
+    /* תיקון גלילה בסלקט במובייל */
+    select {
+        font-size: 16px !important; /* מונע זום במובייל */
     }
 }
 </style>
@@ -319,6 +299,7 @@ if active_tab == tab_names[0]:
     if "chat" not in st.session_state:
         st.session_state.chat=[("bot","שלום גלית! 👋 אני צמרובוט, העוזר האישי שלך למציאת מחליפים. בואי נתחיל - איזו מורה נעדרת?")]
         st.session_state.stage="teacher"
+        st.session_state.show_hours = False
     
     def add(role,msg):
         if not st.session_state.chat or st.session_state.chat[-1]!=(role,msg):
@@ -365,7 +346,6 @@ if active_tab == tab_names[0]:
         st.session_state.teacher = teacher_name
         st.session_state.stage = "day"
         add("bot", f"מעולה! בחרת ב**{teacher_name}**. 📅 לאיזה יום היא נעדרת?")
-        # תיקון - מחיקת המפתח אם קיים
         if 'teacher_search_chat' in st.session_state:
             del st.session_state.teacher_search_chat
 
@@ -384,9 +364,11 @@ if active_tab == tab_names[0]:
         add("user", sc)
         if sc=="יום שלם":
             st.session_state.selected_hours = list(range(1, 10))
+            st.session_state.show_hours = False
             calculate()
         elif sc=="בשעות ספציפיות":
             st.session_state.stage="select_hours"
+            st.session_state.show_hours = True
             # איפוס בחירת השעות
             for h in range(1, 10):
                 st.session_state[f"hour_check_{h}"] = False
@@ -408,9 +390,11 @@ if active_tab == tab_names[0]:
             add("bot", txt)
         add("bot","💜 שמחתי לעזור! תמיד כאן לשירותך. צמרובוט 🌸")
         st.session_state.stage="done"
+        st.session_state.show_hours = False
 
     def start_new_search():
         st.session_state.stage="teacher"
+        st.session_state.show_hours = False
         add("bot", "בואי נתחיל חיפוש חדש! 🔄 איזו מורה נעדרת הפעם?")
         # איפוס בחירת השעות
         for h in range(1, 10):
@@ -427,7 +411,8 @@ if active_tab == tab_names[0]:
             "הקלידי או בחרי שם מורה:",
             [""] + TEACHERS,
             key="teacher_dropdown",
-            help="ניתן להקליד לחיפוש מהיר או לבחור מהרשימה"
+            help="ניתן להקליד לחיפוש מהיר או לבחור מהרשימה",
+            index=0
         )
         
         if selected_teacher and selected_teacher != "":
@@ -441,33 +426,28 @@ if active_tab == tab_names[0]:
         st.radio("",("יום שלם","בשעות ספציפיות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
     
     def display_hour_selection():
-        # רק אם השלב הנוכחי הוא בחירת שעות
-        if st.session_state.stage != "select_hours":
+        if not st.session_state.show_hours:
             return
             
-        add("bot", "⏰ סמני את השעות שבהן המורה נעדרת:")
-        
-        # Initialize hour states if not exists
-        for h in range(1, 10):
-            if f"hour_check_{h}" not in st.session_state:
-                st.session_state[f"hour_check_{h}"] = False
-        
         with st.container():
+            st.markdown('<div class="hours-container">', unsafe_allow_html=True)
             st.markdown("##### בחירת שעות להיעדרות")
             
-            # יצירת רשת עם 2 עמודות (יופיע טוב גם במובייל וגם בדסקטופ)
+            # Initialize hour states if not exists
+            for h in range(1, 10):
+                if f"hour_check_{h}" not in st.session_state:
+                    st.session_state[f"hour_check_{h}"] = False
+            
+            # תמיד 2 עמודות - עובד טוב בכל המכשירים
             col1, col2 = st.columns(2)
             
             # חלוקת השעות בין 2 העמודות
-            hours_col1 = [1, 2, 3, 4, 5]
-            hours_col2 = [6, 7, 8, 9]
-            
             with col1:
-                for h in hours_col1:
+                for h in [1, 2, 3, 4, 5]:
                     st.checkbox(f"שעה {h}", key=f"hour_check_{h}")
             
             with col2:
-                for h in hours_col2:
+                for h in [6, 7, 8, 9]:
                     st.checkbox(f"שעה {h}", key=f"hour_check_{h}")
             
             col_btn1, col_btn2 = st.columns(2)
@@ -487,6 +467,8 @@ if active_tab == tab_names[0]:
                     for h in range(1, 10):
                         st.session_state[f"hour_check_{h}"] = True
                     st.rerun()
+            
+            st.markdown('</div>', unsafe_allow_html=True)
 
     def display_done_state():
         st.button("🔎 חיפוש חדש", on_click=start_new_search, type="primary")
@@ -494,20 +476,20 @@ if active_tab == tab_names[0]:
     # הצגת האלמנטים לפי השלב הנוכחי
     stage = st.session_state.get('stage', 'teacher')
     
-    # מיכל נפרד לאלמנטי הקלט שיימחק אחרי בחירה
-    input_container = st.container()
-    
-    with input_container:
+    # מיכל נפרד לאלמנטי הקלט
+    with st.container():
         if stage =="teacher": 
             display_teacher_selection()
         elif stage =="day": 
             display_day_selection()
         elif stage =="scope": 
             display_scope_selection()
-        elif stage == "select_hours": 
-            display_hour_selection()
         elif stage == "done": 
             display_done_state()
+    
+    # הצגת השעות רק אם צריך
+    if st.session_state.show_hours and stage == "select_hours":
+        display_hour_selection()
     
     # הצגת הצ'אט
     render_chat(chat_container)
@@ -553,7 +535,8 @@ elif active_tab == tab_names[1]:
             "הקלידי או בחרי שם מורה לצפייה במערכת:",
             [""] + TEACHERS,
             key="schedule_dropdown",
-            help="ניתן להקליד לחיפוש מהיר או לבחור מהרשימה"
+            help="ניתן להקליד לחיפוש מהיר או לבחור מהרשימה",
+            index=0
         )
         
         if selected_teacher and selected_teacher != "":
