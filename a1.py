@@ -299,6 +299,7 @@ if active_tab == tab_names[0]:
     if "chat" not in st.session_state:
         st.session_state.chat=[("bot","שלום גלית! 👋 אני צמרובוט, העוזר האישי שלך למציאת מחליפים. בואי נתחיל - איזו מורה נעדרת?")]
         st.session_state.stage="teacher"
+        st.session_state.calculation_done = False
     
     def add(role,msg):
         if not st.session_state.chat or st.session_state.chat[-1]!=(role,msg):
@@ -363,9 +364,11 @@ if active_tab == tab_names[0]:
         add("user", sc)
         if sc=="יום שלם":
             st.session_state.selected_hours = list(range(1, 10))
+            st.session_state.calculation_done = False
             calculate()
         elif sc=="בשעות ספציפיות":
             st.session_state.stage="select_hours"
+            st.session_state.calculation_done = False  # איפוס
             # איפוס בחירת השעות
             for h in range(1, 10):
                 st.session_state[f"hour_check_{h}"] = False
@@ -390,6 +393,7 @@ if active_tab == tab_names[0]:
 
     def start_new_search():
         st.session_state.stage="teacher"
+        st.session_state.calculation_done = False  # איפוס הסימון
         add("bot", "בואי נתחיל חיפוש חדש! 🔄 איזו מורה נעדרת הפעם?")
         # איפוס בחירת השעות
         for h in range(1, 10):
@@ -502,8 +506,8 @@ if active_tab == tab_names[0]:
     # הצגת האלמנטים לפי השלב הנוכחי
     stage = st.session_state.get('stage', 'teacher')
     
-    # מיכל לאלמנטי הקלט - מוצג רק אם לא בשלב done או calculating
-    if stage not in ["done", "calculating"]:
+    # מיכל לאלמנטי הקלט - מוצג רק אם לא בשלב done
+    if stage != "done" and not st.session_state.get("calculation_done", False):
         with st.container():
             if stage == "teacher": 
                 display_teacher_selection()
