@@ -43,13 +43,30 @@ st.markdown("""
     margin: 0;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
-/* הסתרת אלמנטים ריקים */
+/* הסתרת אלמנטים ריקים - משופר */
 .element-container:has(> div:empty) {
+    display: none !important;
+}
+.element-container:has(> .stMarkdown:empty) {
+    display: none !important;
+}
+div[data-testid="column"]:empty {
     display: none !important;
 }
 /* תיקון ליישור אלמנטים */
 div[data-testid="column"] > div {
     width: 100%;
+}
+/* תיקון גלילה ב-selectbox במובייל */
+.stSelectbox select {
+    -webkit-overflow-scrolling: touch !important;
+    overflow-y: auto !important;
+}
+/* במובייל - הגדלת גובה הרשימה */
+@media (max-width: 768px) {
+    .stSelectbox select {
+        max-height: 300px !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -130,6 +147,18 @@ div[data-testid="stCheckbox"] {
 div[data-testid="stCheckbox"] label {
     font-weight: 600;
     font-size: 1.1rem;
+}
+/* רשת שעות - התאמה למובייל */
+@media (max-width: 768px) {
+    /* הסתרת העמודה השלישית במובייל */
+    .hours-selection-grid > div[data-testid="column"]:nth-child(3) {
+        display: none !important;
+    }
+    /* הגדלת העמודות הנותרות */
+    .hours-selection-grid > div[data-testid="column"] {
+        flex: 1 1 50% !important;
+        max-width: 50% !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -412,6 +441,10 @@ if active_tab == tab_names[0]:
         st.radio("",("יום שלם","בשעות ספציפיות"),key="sel_scope",on_change=choose_scope, horizontal=True, index=None)
     
     def display_hour_selection():
+        # רק אם השלב הנוכחי הוא בחירת שעות
+        if st.session_state.stage != "select_hours":
+            return
+            
         add("bot", "⏰ סמני את השעות שבהן המורה נעדרת:")
         
         # Initialize hour states if not exists
@@ -422,14 +455,23 @@ if active_tab == tab_names[0]:
         with st.container():
             st.markdown("##### בחירת שעות להיעדרות")
             
-            # Create grid with streamlit checkboxes in a more elegant way
-            cols = st.columns(3)
-            for i, h in enumerate(range(1, 10)):
-                with cols[i % 3]:
+            # יצירת רשת עם 2 עמודות (יופיע טוב גם במובייל וגם בדסקטופ)
+            col1, col2 = st.columns(2)
+            
+            # חלוקת השעות בין 2 העמודות
+            hours_col1 = [1, 2, 3, 4, 5]
+            hours_col2 = [6, 7, 8, 9]
+            
+            with col1:
+                for h in hours_col1:
                     st.checkbox(f"שעה {h}", key=f"hour_check_{h}")
             
-            col1, col2 = st.columns(2)
-            with col1:
+            with col2:
+                for h in hours_col2:
+                    st.checkbox(f"שעה {h}", key=f"hour_check_{h}")
+            
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
                 if st.button("✅ מצא מחליפים", use_container_width=True, type="primary"):
                     selected_hours = [h for h in range(1, 10) if st.session_state.get(f"hour_check_{h}", False)]
                     if not selected_hours:
@@ -440,7 +482,7 @@ if active_tab == tab_names[0]:
                         add("user", f"שעות נבחרות: {hours_str}")
                         calculate()
             
-            with col2:
+            with col_btn2:
                 if st.button("🔄 בחר הכל", use_container_width=True):
                     for h in range(1, 10):
                         st.session_state[f"hour_check_{h}"] = True
